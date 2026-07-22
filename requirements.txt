@@ -1,0 +1,15 @@
+# Merged from clinical+image/requirements.txt and clinical+report/requirements.txt.
+# torch/torchvision are unpinned here on purpose -- install with the CPU or
+# CUDA build appropriate for the machine (see README "GPU server" section).
+lifelines>=0.29
+matplotlib>=3.10
+numpy>=2.2
+pandas>=2.2
+Pillow>=12.0
+pycox>=0.3.0
+PyYAML>=6.0
+scikit-learn>=1.7
+torchtuples>=0.2.2
+tqdm>=4.66
+torch
+torchvision

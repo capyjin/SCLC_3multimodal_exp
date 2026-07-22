@@ -1,0 +1,27 @@
+# Patient medical data -- MUST NOT be published to the remote (clinical
+# records, PET-CT images, radiology report text). Kept locally only;
+# config.yaml/cohort.py resolve these paths relative to the repo root.
+DATA/
+
+# Training outputs (checkpoints, OOF predictions, logs) are runtime
+# artifacts, not source -- regenerate via main.py.
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Model weights, in case any land outside outputs/
+*.pt
+*.pth
+*.ckpt
+
+# Local tool state, not project content
+.omc/
+
+# OS
+.DS_Store
+Thumbs.db
