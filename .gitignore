@@ -25,3 +25,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Experiment run logs (runtime artifacts)
+*.log

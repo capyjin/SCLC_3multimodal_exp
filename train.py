@@ -165,8 +165,10 @@ class TrimodalEvaluator:
         lr: float = 1e-4, weight_decay: float = 1e-4, epochs: int = 30, batch_size: int = 16,
         save_dir: str = "checkpoints", max_folds: int | None = None,
         device: torch.device | None = None, num_workers: int = 4, seed: int = 42,
+        model_factory=None,
     ):
         self.target = target
+        self.model_factory = model_factory
         self.merged_csv = merged_csv
         self.image_dir = image_dir
         self.split_csv = split_csv
@@ -240,13 +242,16 @@ class TrimodalEvaluator:
             val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
             test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
 
-            model = TrimodalConcatDeepSurv(
-                clinical_dim=clinical_dim, report_dim=report_dim, gray_scale=self.gray_scale,
-                image_proj_dim=self.image_proj_dim, image_dropout=self.image_dropout,
-                clinical_hidden=self.clinical_hidden, clinical_dropout=self.clinical_dropout,
-                report_hidden=self.report_hidden, report_dropout=self.report_dropout,
-                fusion_dropout=self.fusion_dropout,
-            ).to(self.device)
+            if self.model_factory is not None:
+                model = self.model_factory(clinical_dim, report_dim).to(self.device)
+            else:
+                model = TrimodalConcatDeepSurv(
+                    clinical_dim=clinical_dim, report_dim=report_dim, gray_scale=self.gray_scale,
+                    image_proj_dim=self.image_proj_dim, image_dropout=self.image_dropout,
+                    clinical_hidden=self.clinical_hidden, clinical_dropout=self.clinical_dropout,
+                    report_hidden=self.report_hidden, report_dropout=self.report_dropout,
+                    fusion_dropout=self.fusion_dropout,
+                ).to(self.device)
             optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
             if plan_index == 0:
@@ -312,6 +317,8 @@ class ImageOnlyEvaluator:
         lr: float = 1e-4, weight_decay: float = 1e-4, epochs: int = 30, batch_size: int = 16,
         save_dir: str = "checkpoints", max_folds: int | None = None,
         device: torch.device | None = None, num_workers: int = 4, seed: int = 42,
+        model_factory=None, optimizer_factory=None, augment: bool = False,
+        ckpt_tag: str = "image_only",
     ):
         self.target = target
         self.merged_csv = merged_csv
@@ -324,6 +331,15 @@ class ImageOnlyEvaluator:
         self.epochs = epochs
         self.batch_size = batch_size
         self.save_dir = save_dir
+        # Backward-compatible hooks (default None reproduces the SimpleCNN arm
+        # exactly). ``model_factory() -> nn.Module`` swaps the image backbone;
+        # ``optimizer_factory(model) -> Optimizer`` allows differential LR
+        # (e.g. low-LR pretrained backbone + higher-LR head); ``augment``
+        # toggles the train-fold flip augmentation in create_dataset.
+        self.model_factory = model_factory
+        self.optimizer_factory = optimizer_factory
+        self.augment = augment
+        self.ckpt_tag = ckpt_tag
         self.max_folds = max_folds
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_workers = num_workers
@@ -352,7 +368,7 @@ class ImageOnlyEvaluator:
                 print(f"  [skip] fold {fold}: no test samples found")
                 continue
 
-            train_ds, val_ds = ds.create_dataset(train_samples, val_samples, self.resize, False, self.gray_scale, False)
+            train_ds, val_ds = ds.create_dataset(train_samples, val_samples, self.resize, self.augment, self.gray_scale, False)
             _, test_ds = ds.create_dataset(train_samples, test_samples, self.resize, False, self.gray_scale, False)
 
             loader_kwargs = {"num_workers": self.num_workers, "pin_memory": True, "worker_init_fn": _seed_worker}
@@ -362,10 +378,16 @@ class ImageOnlyEvaluator:
             val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
             test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
 
-            model = ImageOnlyDeepSurv(gray_scale=self.gray_scale).to(self.device)
-            optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+            if self.model_factory is not None:
+                model = self.model_factory().to(self.device)
+            else:
+                model = ImageOnlyDeepSurv(gray_scale=self.gray_scale).to(self.device)
+            if self.optimizer_factory is not None:
+                optimizer = self.optimizer_factory(model)
+            else:
+                optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-            save_path = os.path.join(self.save_dir, f"fold{fold}_image_only_{self.target}.pt")
+            save_path = os.path.join(self.save_dir, f"fold{fold}_{self.ckpt_tag}_{self.target}.pt")
             fold_history = fit(model, train_loader, val_loader, optimizer, self.device, self.epochs, save_path)
             self.training_history.extend([{"target": self.target, "fold": fold, **row} for row in fold_history])
 
