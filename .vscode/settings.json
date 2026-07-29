@@ -1,0 +1,8 @@
+{
+    // .gitignore에 *.pt / *.pth / *.ckpt / outputs/ 가 제외되어 있어서
+    // 기본 설정으로는 검색·Quick Open·탐색기에서 체크포인트 파일이 보이지 않음.
+    // git 추적 여부와 무관하게 로컬에서는 항상 보이도록 무시 설정을 끔.
+    "search.useIgnoreFiles": false,
+    "search.useParentIgnoreFiles": false,
+    "explorer.excludeGitIgnore": false
+}

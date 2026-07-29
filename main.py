@@ -202,7 +202,7 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
 
 def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
-    import late_fusion as lf
+    import late_fusion_3modal as lf
     import cohort
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
