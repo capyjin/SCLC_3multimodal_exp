@@ -43,7 +43,7 @@ def resolve(cfg: dict, key: str) -> str:
 
 def cmd_smoke_test(cfg: dict) -> None:
     """No-torch check: paths exist, cohort/manifest/split agree, corpus loads."""
-    import cohort
+    from core import cohort
 
     checks = []
     merged_csv = resolve(cfg, "merged_csv")
@@ -71,7 +71,7 @@ def cmd_smoke_test(cfg: dict) -> None:
         checks.append((f"fold {fold} train/val/test overlap == 0", len(overlap) == 0))
         checks.append((f"fold {fold} cohort union == {n_cohort}", len(tr | va | te) == n_cohort))
 
-    import features
+    from core import features
     corpus, _ = features.load_text_corpus(merged_csv)
     checks.append(("text corpus loads (has_report=1 patients)", len(corpus) > 0))
 
@@ -90,8 +90,8 @@ def _experiment_id(experiment: str, mode: str) -> str:
     return f"EXP_{date}_{experiment}_{mode}"
 
 
-def _write_artifacts(cfg, experiment_id, contract, fold_records_by_target, oof_by_target, extra_history_by_target=None):
-    import reporting
+def _write_artifacts(cfg, experiment_id, contract, fold_records_by_target, oof_by_target):
+    from core import reporting
 
     output_root = resolve(cfg, "output_dir")
     dirs = reporting.prepare_experiment_dir(output_root, experiment_id)
@@ -117,9 +117,46 @@ def _write_artifacts(cfg, experiment_id, contract, fold_records_by_target, oof_b
     return dirs, summaries
 
 
+def _base_contract(cfg: dict, experiment_id: str, targets, epochs: int, mode: str) -> dict:
+    """두 실험 계약(contract)이 공유하는 항목.
+
+    early/late 두 블록에 30줄 넘게 똑같은 문자열이 복붙돼 있었다. 코호트·split·
+    전처리 규약은 **정의상 두 실험이 같아야** 비교가 성립하므로(프로토콜 4.4),
+    한 곳에서만 정의해 한쪽만 수정되는 사고를 막는다. 실험마다 다른 항목
+    (hypothesis / model / loss 등)은 각 호출부에서 덮어쓴다.
+    """
+    return {
+        "experiment_id": experiment_id,
+        "modalities": ["image", "clinical", "report"],
+        "cohort_rule": cfg["experiment"]["cohort_rule"],
+        "manifest_path": "data_manifest.csv (this experiment folder)",
+        "actual_n": 238,
+        "target": list(targets),
+        "split_file": "splits/trimodal_common_5fold_seed42_v1.csv",
+        "split_method": "identical to clinical+report/report_common_5fold_seed42_v1.csv "
+                        "(StratifiedKFold on joint OS/PFS event)",
+        "n_folds": 5,
+        "seed": int(cfg["reproducibility"]["seed"]),
+        "image_preprocessing": "grayscale, resize 512, per-train-fold mean/std normalize, "
+                               "random h-flip (train only)",
+        "clinical_preprocessing": "21 features (8 standardized continuous + 13 categorical "
+                                  "passthrough), StandardScaler fit on train fold only",
+        "text_preprocessing": "char n-gram(2,4) TF-IDF, max_features=400, vocabulary fit on "
+                              "train fold only; dates/hospital names masked",
+        "pretrained_or_scratch": "scratch (SimpleCNN has no pretrained weights)",
+        "optimizer": "Adam",
+        "learning_rate": float(cfg["training"]["learning_rate"]),
+        "batch_size": int(cfg["training"]["batch_size"]),
+        "epochs": epochs,
+        "primary_metric": "C-index",
+        "output_dir": str(ROOT / "outputs"),
+        "mode": mode,
+    }
+
+
 def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
-    from train import TrimodalEvaluator
+    from core.train import TrimodalEvaluator
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
     max_folds = 1 if mode == "batch_smoke" else None
@@ -153,7 +190,7 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         print(f"\n[early_fusion/{target}] mean C-index: {sum(ev.c_indices) / len(ev.c_indices):.4f}")
 
     contract = {
-        "experiment_id": experiment_id,
+        **_base_contract(cfg, experiment_id, targets, epochs, mode),
         "experiment_name": "Tri-modal early (concat) fusion: image + clinical + report",
         "hypothesis": "Concatenating image, clinical, and report embeddings before a single Cox head "
                        "outperforms any single modality and (per earlyfusion.md) is expected to also "
@@ -170,40 +207,23 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
                              "Adam lr=1e-4 wd=1e-4, batch=16, epochs=30, seed=42, 5-fold.",
         "unavoidable_changes": "Cohort is 238 (tri-modal common) vs 257 (image+clinical baseline) or "
                                 "238 (report_common) individually -- same n as report_common by construction.",
-        "modalities": ["image", "clinical", "report"],
-        "cohort_rule": cfg["experiment"]["cohort_rule"],
-        "manifest_path": "data_manifest.csv (this experiment folder)",
-        "actual_n": 238,
-        "target": list(targets),
-        "split_file": "splits/trimodal_common_5fold_seed42_v1.csv",
-        "split_method": "identical to clinical+report/report_common_5fold_seed42_v1.csv (StratifiedKFold on joint OS/PFS event)",
-        "n_folds": 5,
-        "seed": int(cfg["reproducibility"]["seed"]),
-        "image_preprocessing": "grayscale, resize 512, per-train-fold mean/std normalize, random h-flip (train only)",
-        "clinical_preprocessing": "21 features (8 standardized continuous + 13 categorical passthrough), StandardScaler fit on train fold only",
-        "text_preprocessing": "char n-gram(2,4) TF-IDF, max_features=400, vocabulary fit on train fold only; dates/hospital names masked",
-        "model": "TrimodalConcatDeepSurv (model.py)",
-        "pretrained_or_scratch": "scratch (SimpleCNN has no pretrained weights)",
+        "model": "ConcatDeepSurv, all three branches on (core/model.py)",
         "freeze_policy": "none -- all branches trained end-to-end",
-        "loss": "Cox negative partial log-likelihood (train.cox_ph_loss)",
-        "optimizer": "Adam",
-        "learning_rate": float(cfg["training"]["learning_rate"]),
-        "batch_size": int(cfg["training"]["batch_size"]),
-        "epochs": epochs,
+        "loss": "Cox negative partial log-likelihood (core.train.cox_ph_loss)",
         "early_stopping": "none (best-val-C-index checkpoint selection, matching clinical+image/train.py)",
         "checkpoint_rule": "save state_dict whenever val C-index improves; reload best before test evaluation",
-        "primary_metric": "C-index",
         "secondary_metrics": ["train/val C-index gap", "fold std", "OOF pooled C-index"],
-        "output_dir": str(ROOT / "outputs"),
-        "mode": mode,
     }
     _write_artifacts(cfg, contract["experiment_id"], contract, fold_records_by_target, oof_by_target)
 
 
 def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
+    from core import cohort
+    from core import fusion_stack
+
+    sys.path.insert(0, str(ROOT / "실험1_기본융합_early_late"))
     import late_fusion_3modal as lf
-    import cohort
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
     max_folds = 1 if mode == "batch_smoke" else None
@@ -243,11 +263,11 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         oof = list(image_res["oof_predictions"]) + list(clinical_res["oof_predictions"]) + list(report_res["oof_predictions"])
 
         if max_folds is None:
-            combined = lf.combine_weighted_sum(
+            combined = fusion_stack.combine_weighted_sum(
                 cohort_df, target,
-                lf._oof_lookup(image_res["oof_predictions"]),
-                lf._oof_lookup(clinical_res["oof_predictions"]),
-                lf._oof_lookup(report_res["oof_predictions"]),
+                fusion_stack.oof_dict(image_res["oof_predictions"]),
+                fusion_stack.oof_dict(clinical_res["oof_predictions"]),
+                fusion_stack.oof_dict(report_res["oof_predictions"]),
                 max_folds=max_folds,
             )
             fold_records += combined["fold_records"]
@@ -260,7 +280,7 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         oof_by_target[target] = oof
 
     contract = {
-        "experiment_id": experiment_id,
+        **_base_contract(cfg, experiment_id, targets, epochs, mode),
         "experiment_name": "Tri-modal late (out-level, weighted-sum) fusion: image + clinical + report",
         "hypothesis": "A learned linear combination of independently-trained unimodal OOF risk scores "
                        "(image-only, clinical-only, report-only) is a weaker fusion strategy than "
@@ -276,32 +296,14 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
                              "for each unimodal arm.",
         "unavoidable_changes": "Each unimodal arm has its own risk-score scale before combination; the "
                                 "combiner is fit fold-wise on OOF risk (not on raw features).",
-        "modalities": ["image", "clinical", "report"],
-        "cohort_rule": cfg["experiment"]["cohort_rule"],
-        "manifest_path": "data_manifest.csv (this experiment folder)",
-        "actual_n": 238,
-        "target": list(targets),
-        "split_file": "splits/trimodal_common_5fold_seed42_v1.csv",
-        "split_method": "identical to clinical+report/report_common_5fold_seed42_v1.csv (StratifiedKFold on joint OS/PFS event)",
-        "n_folds": 5,
-        "seed": int(cfg["reproducibility"]["seed"]),
-        "image_preprocessing": "grayscale, resize 512, per-train-fold mean/std normalize, random h-flip (train only)",
-        "clinical_preprocessing": "21 features (8 standardized continuous + 13 categorical passthrough), StandardScaler fit on train fold only",
-        "text_preprocessing": "char n-gram(2,4) TF-IDF, max_features=400, vocabulary fit on train fold only; dates/hospital names masked",
-        "model": "ImageOnlyDeepSurv + generate_net(clinical) + generate_net(report) + lifelines CoxPHFitter combiner",
-        "pretrained_or_scratch": "scratch",
+        "model": "ImageOnlyDeepSurv + generate_net(clinical) + generate_net(report) "
+                 "+ lifelines CoxPHFitter combiner (core/fusion_stack.py)",
         "freeze_policy": "none; each unimodal arm trained independently, combiner fit on frozen OOF risk scores",
         "loss": "Cox negative partial log-likelihood per unimodal arm; CoxPHFitter partial likelihood for the combiner",
         "optimizer": "Adam (unimodal arms); Newton-Raphson (lifelines CoxPHFitter combiner)",
-        "learning_rate": float(cfg["training"]["learning_rate"]),
-        "batch_size": int(cfg["training"]["batch_size"]),
-        "epochs": epochs,
         "early_stopping": "none (image-only: best-val-C-index checkpoint; clinical/report-only: pycox CoxPH default)",
         "checkpoint_rule": "image-only: save state_dict whenever val C-index improves. clinical/report-only: in-memory pycox model.",
-        "primary_metric": "C-index",
         "secondary_metrics": ["per-modality unimodal C-index", "learned combination coefficients"],
-        "output_dir": str(ROOT / "outputs"),
-        "mode": mode,
     }
     _write_artifacts(cfg, contract["experiment_id"], contract, fold_records_by_target, oof_by_target)
 
