@@ -28,6 +28,10 @@ if not hasattr(scipy.integrate, "simps"):
 np.random.seed(1234)
 _ = torch.manual_seed(123)
 
+# 촬영 아티팩트로 픽셀이 반전돼 저장된 환자들(원본 프로젝트에서 그대로 가져온
+# 목록). 영상을 쓰는 모든 코드가 같은 보정을 해야 하므로 여기 한 곳에만 둔다.
+INVERTED_IMAGE_IDS = [9, 223, 233, 293, 298]
+
 
 def preprocess_data(image_dir_path, df, target, gray_scale=True):
     """Loads CT-slice PNGs paired with survival labels for the given rows.
@@ -58,7 +62,7 @@ def preprocess_data(image_dir_path, df, target, gray_scale=True):
             image_not_found.append(int(research_id))
             continue
 
-        if research_id in [9, 223, 233, 293, 298]:
+        if research_id in INVERTED_IMAGE_IDS:
             img = ImageOps.invert(img)
 
         samples.append({

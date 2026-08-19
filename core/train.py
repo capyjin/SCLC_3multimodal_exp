@@ -356,7 +356,7 @@ class ImageOnlyEvaluator:
         save_dir: str = "checkpoints", max_folds: int | None = None,
         device: torch.device | None = None, num_workers: int = 4, seed: int = 42,
         model_factory=None, optimizer_factory=None, augment: bool = False,
-        ckpt_tag: str = "image_only",
+        ckpt_tag: str = "image_only", cohort_transform=None,
     ):
         self.target = target
         self.merged_csv = merged_csv
@@ -378,6 +378,10 @@ class ImageOnlyEvaluator:
         self.optimizer_factory = optimizer_factory
         self.augment = augment
         self.ckpt_tag = ckpt_tag
+        # ``cohort_transform(cohort_df) -> cohort_df`` 는 코호트를 읽은 직후 한 번
+        # 호출되는 훅이다. 라벨 순열검정(실험10)이 (days, event) 를 환자 간에
+        # 재배치할 때 쓴다. None 이면 기존 동작과 완전히 동일하다.
+        self.cohort_transform = cohort_transform
         self.max_folds = max_folds
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_workers = num_workers
@@ -391,6 +395,8 @@ class ImageOnlyEvaluator:
 
     def run(self) -> "ImageOnlyEvaluator":
         cohort_df = cohort.load_trimodal_cohort(self.merged_csv, self.split_csv)
+        if self.cohort_transform is not None:
+            cohort_df = self.cohort_transform(cohort_df)
         clinical_frame = cohort_df.drop_duplicates("research_id").set_index("research_id")
 
         self.c_indices, self.fold_records, self.oof_predictions, self.training_history = [], [], [], []
@@ -444,6 +450,11 @@ class ImageOnlyEvaluator:
             durations = np.array(durations, dtype=np.float32)
             events = np.array(events, dtype=np.float32)
             ci = concordance_index(durations, -risks, events)
+            if len(risks) != len(ids["test"]):
+                # PNG 누락으로 표본이 빠지면 research_id 와 위험점수가 한 칸씩
+                # 어긋난 채 OOF 에 저장된다. 조용히 틀린 수치가 나오느니 멈춘다.
+                raise RuntimeError(f"fold {fold}: test 표본 {len(risks)} != 환자 {len(ids['test'])} "
+                                   "(PNG 누락). research_id 정렬이 깨지므로 중단한다.")
             self.c_indices.append(ci)
             self.fold_records.append({
                 "target": self.target, "modality": "image_only", "fold": fold,
