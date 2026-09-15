@@ -1,41 +1,47 @@
 # -*- coding: utf-8 -*-
-"""Late fusion 3-way — 세 모달리티를 **각각 독립으로** 학습한 뒤 가중합.
+"""단일모달 **pycox** arm — 3-way late fusion 이 쓰는 임상/판독지/영상 축.
 
-같은 238명/5-fold 코호트에서 단일모달 3개를 따로 학습하고, fold별 OOF 위험점수
-3개를 CoxPH 로 선형 결합한다(계수 = 가중치).
+[왜 src/sclc 에 있나]
+  이 코드는 실험 폴더 안의 ``실험1_기본융합_early_late/late_fusion_3modal.py``
+  였는데, 실험 파일이면서 동시에 **라이브러리**로 쓰이고 있었다:
 
-- image-only    : ``core.train.ImageOnlyEvaluator`` (이미지는 PNG 를 그때그때
-                  읽어야 해서 pycox 를 쓸 수 없어 커스텀 Cox 루프를 쓴다)
-- clinical-only : pycox CoxPH + torchtuples MLPVanilla, num_nodes=[128]*4,
-                  dropout=0.5 — earlyfusion.md 의 clinical-only 절제와 같은 용량
-- report-only   : pycox CoxPH + torchtuples MLPVanilla, num_nodes=[32,16],
-                  dropout=0.3 — early fusion 의 판독지 브랜치와 동일 형태
+      exp_late_fusion_3modal_rerun.py :  import late_fusion_3modal as lf
+      main.py                          :  sys.path.insert(... 실험1 폴더 ...)
+                                          import late_fusion_3modal as lf
 
-⚠️ 이 파일의 clinical/report arm 은 **pycox 경로**라, 실험3(ablation)의
-``clin_only``/``report_only``(커스텀 torch 루프)와는 다른 코드 경로다. 수치가
-서로 달라도 버그가 아니며, 그래서 서로 재사용하지 않는다.
+  ``main.py`` 가 실험 폴더를 sys.path 에 끼워 넣어야만 돌아간다는 건, 그 코드가
+  실험이 아니라 인프라라는 뜻이다. 저장소 규칙("두 곳 이상이 쓰는 코드는
+  ``src/sclc`` 로 올린다")대로 여기로 옮겼다. 함수 이름·시그니처·기본값은
+  전부 그대로라서 호출부는 import 경로만 바뀐다.
 
-결합 함수(``combine_weighted_sum``)와 OOF 헬퍼는 ``core.fusion_stack`` 에 있다
-— 2-way(실험1 method B)와 절차가 같아 한 곳으로 합쳤다.
+[이 arm 들이 ``sclc.train`` 의 평가기와 다른 이유 — 재사용하면 안 된다]
+  여기 clinical/report arm 은 **pycox CoxPH + torchtuples MLPVanilla** 경로다.
+  실험3(ablation)의 ``clin_only``/``report_only`` 는 커스텀 torch Cox 루프이고,
+  같은 모달리티라도 코드 경로가 다르다. 수치가 서로 달라도 버그가 아니며,
+  그래서 서로 재사용하지 않는다. 이 파일이 존재하는 유일한 목적은 2026-07-22
+  3-way 실행과 **같은 아키텍처**를 유지하는 것이다.
+
+  - clinical-only : MLPVanilla num_nodes=[128]*4, dropout=0.5
+  - report-only   : MLPVanilla num_nodes=[32,16], dropout=0.3 (TF-IDF 400)
+  - image-only    : ``sclc.train.ImageOnlyEvaluator`` (PNG 를 그때그때 읽어야 해
+                    pycox 를 쓸 수 없다 -> 커스텀 Cox 루프)
+
+[누수 방지]
+  fold 마다 인코더(임상 스케일러/TF-IDF)를 **train 환자로만 fit** 한다.
+  ``x_by_split_fn`` 콜러블이 그 계약을 지는 유일한 지점이다.
 """
-import os
-import sys
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
-
 import pandas as pd
 import torch.optim as optim
 from lifelines.utils import concordance_index
 
-from core import features
-from core.fusion_stack import labels_by_id
-from core.model import generate_net, get_cox_ph_model
-from core.train import ImageOnlyEvaluator, fold_plan, seed_everything
+from sclc import cohort, features
+from sclc.fusion_stack import labels_by_id
+from sclc.model import generate_net, get_cox_ph_model
+from sclc.train import ImageOnlyEvaluator, fold_plan, seed_everything
 
 
-def _run_pycox_arm(cohort_df, target, modality, x_by_split_fn, num_nodes, dropout,
-                   lr, epochs, batch_size, max_folds, seed) -> dict:
+def run_pycox_arm(cohort_df, target, modality, x_by_split_fn, num_nodes, dropout,
+                  lr, epochs, batch_size, max_folds, seed) -> dict:
     """clinical-only / report-only 가 공유하는 fold 루프.
 
     두 함수는 **인코더만 다르고** (임상 인코더 vs TF-IDF) 나머지 —
@@ -84,11 +90,12 @@ def run_clinical_only(cohort_df: pd.DataFrame, target: str, num_nodes=(128, 128,
         enc = features.ClinicalEncoder(clinical_frame, standardize_cols, categorical_cols)
         return (enc.fit_transform(ids["train"]), enc.transform(ids["val"]), enc.transform(ids["test"]))
 
-    return _run_pycox_arm(cohort_df, target, "clinical_only", x_by_split, num_nodes, dropout,
-                          lr, epochs, batch_size, max_folds, seed)
+    return run_pycox_arm(cohort_df, target, "clinical_only", x_by_split, num_nodes, dropout,
+                         lr, epochs, batch_size, max_folds, seed)
 
 
-def run_report_only(cohort_df: pd.DataFrame, target: str, merged_csv: str, num_nodes=(32, 16),
+def run_report_only(cohort_df: pd.DataFrame, target: str,
+                    merged_csv: str = cohort.DEFAULT_MERGED_CSV, num_nodes=(32, 16),
                     dropout=0.3, tfidf_max_features=400, tfidf_ngram_range=(2, 4),
                     lr=1e-4, epochs=30, batch_size=16, max_folds=None, seed=42) -> dict:
     """판독지 TF-IDF 만 쓰는 단일모달 arm (pycox CoxPH)."""
@@ -100,8 +107,8 @@ def run_report_only(cohort_df: pd.DataFrame, target: str, merged_csv: str, num_n
                 enc.transform([corpus.get(rid, "") for rid in ids["val"]]),
                 enc.transform([corpus.get(rid, "") for rid in ids["test"]]))
 
-    return _run_pycox_arm(cohort_df, target, "report_only", x_by_split, num_nodes, dropout,
-                          lr, epochs, batch_size, max_folds, seed)
+    return run_pycox_arm(cohort_df, target, "report_only", x_by_split, num_nodes, dropout,
+                         lr, epochs, batch_size, max_folds, seed)
 
 
 def run_image_only(target: str, merged_csv, image_dir, split_csv, epochs=30, batch_size=16,
