@@ -7,6 +7,7 @@
 |---|---|
 | `analyze_late_fusion_pfs.py` | `python experiments/실험1_기본융합_early_late/analyze_late_fusion.py contribution` |
 | `verify_shuffle_sanity.py` | `python experiments/실험1_기본융합_early_late/analyze_late_fusion.py shuffle-sanity` |
+| `analyze_collinearity.py` | `python experiments/실험1_기본융합_early_late/analyze_late_fusion.py contribution` (③ tabular↔image 위험점수 상관) |
 
 산출물 경로는 바뀌지 않았다 — `outputs/late_fusion_B/pfs_diagnosis.json`.
 정리 당시 기존 JSON 과 재귀 비교해 **차이 0건**(200회 순열검정의 draws 200개

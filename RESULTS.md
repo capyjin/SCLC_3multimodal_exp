@@ -521,6 +521,8 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 
 **그래서 직접 실험했다 — 이미지 칸을 판독지와 같은 16으로 줄이면?**
 ([experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py](experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py), `outputs/balance_dims/`)
+> ⚠️ 이 교정 시도는 **폐기**됐다(채택 모델은 late fusion 2-way). 아래 결과와 결론은
+> 그대로 유효하고 스크립트도 남아 있다 — [실험4 README](experiments/실험4_영상_발언권독점_진단/README.md).
 
 **표 9-4c. `image_proj_dim` 128 → 16 (다른 조건 전부 고정)**
 
@@ -707,6 +709,11 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 > 따라서 학습 트릭으로는 흉내낼 수 없다.
 
 자세한 내용: [RESULTS_ogm_ge.md](experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
+
+> ⚠️ OGM-GE 를 비롯한 §9.7 의 융합 교정 시도는 전부 **폐기**됐다 — 채택 모델은
+> late fusion 2-way 다. 어느 스크립트가 폐기이고 어느 진단 스크립트가 현역인지는
+> [실험4 README](experiments/실험4_영상_발언권독점_진단/README.md) 에 정리돼 있다.
+> 같은 방향의 후속 시도와 그 결과는 실험11(MoE 게이트)·실험12(융합 구조 조건통일).
 
 #### 9.7.4 세 시도의 성능 전체 표
 
@@ -966,7 +973,7 @@ PFS:  0.668   tabular 단독 (추정할 가중치 1개)
 #### 10.5.1 "섞은 것(0.658)보다 진짜(0.653)가 더 낮은 게 말이 되나?" ★자주 나오는 질문
 
 당연히 이상해 보인다. 정보가 있는 진짜 이미지가 무정보 잡음보다 못하다니? 두 가지를 검정했다.
-([experiments/실험5_late융합_영상기여도_검정/analyze_collinearity.py](experiments/실험5_late융합_영상기여도_검정/analyze_collinearity.py))
+([experiments/실험1_기본융합_early_late/analyze_late_fusion.py](experiments/실험1_기본융합_early_late/analyze_late_fusion.py) `contribution` 서브커맨드 ③ — 옛 `실험5/analyze_collinearity.py`)
 
 **의심 ①: 진짜 이미지는 tabular와 겹치니까, 겹침이 좋은 변수를 방해한 것 아닐까?**
 
