@@ -36,3 +36,8 @@ Thumbs.db
 # 정리 메모(survey/*.md)만 추적한다.
 survey/*.pdf
 survey/*.bak
+
+# 논문 그림 TikZ 빌드 스크래치(aux/log/stdout/중간 pdf).
+# 내보낸 결과물 report_assets/paper/fig*.{pdf,svg,png} 만 추적한다 —
+# 재빌드에 사용자 공간 TinyTeX 가 필요해 누구나 만들 수 있는 게 아니다.
+report_assets/paper/build/

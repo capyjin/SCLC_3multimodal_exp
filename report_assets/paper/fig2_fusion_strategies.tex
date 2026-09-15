@@ -1,0 +1,103 @@
+% Figure 2 — Fusion strategies compared (MoR Fig.2 레이아웃: (a)(b)(c) 세 패널).
+%   (a) early fusion (concat): 세 브랜치 -> L2 -> concat 272 -> Cox head 하나, end-to-end
+%   (b) late fusion, three-way: 세 축 각각 독립 학습 -> r_img, r_clin, r_rep -> CoxPH(3)
+%   (c) late fusion, two-way (ours): tabular arm(임상+판독지 공동학습) + image arm -> CoxPH(2)
+% 점선 상자 = 독립적으로 학습되는 모델 하나. 수치 출처: src/sclc/model.py, MODEL_SUMMARY.md §3.
+\documentclass[tikz,border=6pt]{standalone}
+\input{figstyle}
+
+% 세 패널이 공유하는 입력 + 모달리티 브랜치 (좌표는 scope 안에서 상대).
+\newcommand{\inputsandbranches}{%
+  % 입력단은 글자 대신 모달리티 아이콘: 실제 PET-CT MIP 한 장 / 임상 변수 표 / 판독지 문서.
+  \iconimage{xi}{(0,-0.3)}
+  \iconclinical{xc}{(1.9,-0.3)}
+  \iconreport{xr}{(3.8,-0.3)}
+  \node[lay=boxblue,   minimum width=16mm] (bi) at (0,1.15)   {CNN};
+  \node[lay=boxpurple, minimum width=16mm] (bc) at (1.9,1.15) {MLP};
+  \node[lay=boxpink,   minimum width=16mm, font=\scriptsize] (br) at (3.8,1.15) {RadBERT--MLP};
+  \draw[arr] (xi) -- (bi); \draw[arr] (xc) -- (bc); \draw[arr] (xr) -- (br);
+}
+
+\begin{document}
+\begin{tikzpicture}[x=1cm,y=1cm]
+
+% ===================== (a) early fusion (concat) =====================
+\begin{scope}[shift={(0,0)}]
+  \inputsandbranches
+  \node[op] (li) at (0,1.95)   {$\ell_2$};
+  \node[op] (lc) at (1.9,1.95) {$\ell_2$};
+  \node[op] (lr) at (3.8,1.95) {$\ell_2$};
+  \node[blk, minimum width=52mm]           (cat) at (1.9,2.7)  {concat: $128\oplus128\oplus16=272$};
+  \node[blk=boxyellow, minimum width=52mm] (hd)  at (1.9,3.45) {Cox head (one loss, one schedule)};
+  \node[risk] (o) at (1.9,4.2) {risk};
+  \draw[arr] (bi) -- (li); \draw[arr] (bc) -- (lc); \draw[arr] (br) -- (lr);
+  \draw[arr] (li.north) -- (li.north |- cat.south);
+  \draw[arr] (lc.north) -- (lc.north |- cat.south);
+  \draw[arr] (lr.north) -- (lr.north |- cat.south);
+  \draw[arr] (cat) -- (hd); \draw[arr] (hd) -- (o);
+  \begin{scope}[on background layer]
+    \node[armbox, fit=(bi)(br)(hd)] {};
+  \end{scope}
+  \node[ptitle] at (1.9,-1.35) {(a) Early fusion (concat)};
+\end{scope}
+
+% ===================== (b) late fusion, three-way =====================
+\begin{scope}[shift={(6.5,0)}]
+  \inputsandbranches
+  \node[blk=boxyellow, minimum width=16mm] (hi) at (0,1.95)   {Cox head};
+  \node[blk=boxyellow, minimum width=16mm] (hc) at (1.9,1.95) {Cox head};
+  \node[blk=boxyellow, minimum width=16mm] (hr) at (3.8,1.95) {Cox head};
+  \node[risk] (ri) at (0,2.7)   {$r_{\text{img}}$};
+  \node[risk] (rc) at (1.9,2.7) {$r_{\text{clin}}$};
+  \node[risk] (rr) at (3.8,2.7) {$r_{\text{rep}}$};
+  \node[blk=boxyellow, minimum width=52mm, minimum height=9.5mm] (cb) at (1.9,3.6)
+        {\textbf{Cox PH combiner}\\ $\beta_{\text{img}}r_{\text{img}}+\beta_{\text{clin}}r_{\text{clin}}+\beta_{\text{rep}}r_{\text{rep}}$};
+  \node[risk] (o) at (1.9,4.5) {risk};
+  \draw[arr] (bi) -- (hi); \draw[arr] (bc) -- (hc); \draw[arr] (br) -- (hr);
+  \draw[arr] (hi) -- (ri); \draw[arr] (hc) -- (rc); \draw[arr] (hr) -- (rr);
+  \draw[arr] (ri.north) -- (ri.north |- cb.south);
+  \draw[arr] (rc.north) -- (rc.north |- cb.south);
+  \draw[arr] (rr.north) -- (rr.north |- cb.south);
+  \draw[arr] (cb) -- (o);
+  \begin{scope}[on background layer]
+    \node[armbox, fit=(bi)(hi)] {};
+    \node[armbox, fit=(bc)(hc)] {};
+    \node[armbox, fit=(br)(hr)] {};
+  \end{scope}
+  \node[ptitle] at (1.9,-1.35) {(b) Late fusion, three-way};
+\end{scope}
+
+% ===================== (c) late fusion, two-way (ours) =====================
+\begin{scope}[shift={(13.0,0)}]
+  \inputsandbranches
+  % tabular arm: clinical + report trained jointly
+  \node[op] (lc) at (1.9,1.95) {$\ell_2$};
+  \node[op] (lr) at (3.8,1.95) {$\ell_2$};
+  \node[blk, minimum width=33mm]           (cat) at (2.85,2.7)  {concat: $128\oplus16$};
+  \node[blk=boxyellow, minimum width=33mm] (ht)  at (2.85,3.45) {Cox head};
+  \node[risk] (rt) at (2.85,4.2) {$r_{\text{tab}}$};
+  % image arm
+  \node[blk=boxyellow, minimum width=16mm] (hi) at (0,3.45) {Cox head};
+  \node[risk] (ri) at (0,4.2) {$r_{\text{img}}$};
+  % combiner
+  \node[blk=boxyellow, minimum width=54mm, minimum height=9.5mm] (cb) at (1.9,5.1)
+        {\textbf{Cox PH combiner}\\ $\beta_{\text{tab}}r_{\text{tab}}+\beta_{\text{img}}r_{\text{img}}$};
+  \node[risk] (o) at (1.9,6.0) {risk};
+  \draw[arr] (bc) -- (lc); \draw[arr] (br) -- (lr);
+  \draw[arr] (lc.north) -- (lc.north |- cat.south);
+  \draw[arr] (lr.north) -- (lr.north |- cat.south);
+  \draw[arr] (cat) -- (ht); \draw[arr] (ht) -- (rt);
+  \draw[arr] (bi) -- (hi);  \draw[arr] (hi) -- (ri);
+  \draw[arr] (ri.north) -- (ri.north |- cb.south);
+  \draw[arr] (rt.north) -- (rt.north |- cb.south);
+  \draw[arr] (cb) -- (o);
+  \begin{scope}[on background layer]
+    \node[armbox, fit=(bi)(hi)] (imarm) {};
+    \node[armbox, fit=(bc)(br)(cat)(ht)] (tabarm) {};
+  \end{scope}
+  % arm 이름은 캡션에서 설명한다 (상자 위 라벨은 r_img/r_tab 화살표와 겹친다).
+  \node[ptitle] at (1.9,-1.35) {(c) Late fusion, two-way (ours)};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}
