@@ -67,7 +67,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | | **TF-IDF (채택, 최고)** | RadBERT |
 |---|---|---|
 | **성능 OS** | 0.7057 ± 0.048 | **0.7153** ± 0.033 |
-| **성능 PFS** | **0.6696 ± 0.041** | 0.6456 ± ? |
+| **성능 PFS** | **0.6696 ± 0.041** | 0.6456 ± 0.019 |
 | **모델 구조** | clinical 브랜치(128×4) + 판독지 브랜치(400→32→16) → L2 정규화 후 concat(144차원) → Cox head | 판독지 인코더만 RadBERT(768차원, 전처리 없음)로 교체, 나머지 구조 동일 |
 | **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["clin_report"]`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_fusion.py`, `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험3_모달리티_절제실험/ablation.py --target os --configs clin_report` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` |
@@ -100,10 +100,10 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 
 | | |
 |---|---|
-| **성능** | **(빈칸)** — `brain_meta` 수정 후 미측정 |
-| **수정 전 참고값** | OS 0.6775 / PFS 0.6390 (2026-08-02 이전) |
+| **성능 (RadBERT, brain_meta 수정 후)** | OS 0.6879 ± 0.0544 / PFS 0.6555 ± 0.0476 |
+| **참고값 (TF-IDF, brain_meta 수정 전, 2026-08-02 이전)** | OS 0.6775 / PFS 0.6390 |
 | **모델 구조** | clinical(128) + 영상(128) + 판독지(16) 세 브랜치를 L2 정규화 후 이어붙여(272차원) 하나의 Cox head로 학습 |
-| **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["all"]`) |
+| **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["all"]`) — RadBERT 재측정은 `experiments/실험12_융합방식_조건통일/exp_fusion_methods.py` |
 | **비고** | 이 방식은 영상이 최종 위험점수의 70~80%를 독점해서 성능이 오히려 깎이는 문제가 있었다(`RESULTS.md` §9). 그래서 아래 late fusion으로 대체됐고, 최종 후보에서 제외됐다 |
 
 ### 3-2. late fusion 2-way (tabular=clinical+판독지 하나로 학습 + 영상) — **최종 채택 모델 (OS 기준)**
@@ -111,7 +111,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | | **TF-IDF (채택, 최고)** | RadBERT |
 |---|---|---|
 | **성능 OS** | **0.7143 ± 0.051** | 0.7224 ± 0.033 |
-| **성능 PFS** | **0.6621 ± 0.040** | 0.6470 ± ? |
+| **성능 PFS** | **0.6621 ± 0.040** | 0.6470 ± 0.029 |
 | **모델 구조** | ① clinical+판독지를 §2-1 구조로 **함께** 학습해 위험점수 1개를 뽑고 ② 영상(SimpleCNN)을 §1-3 구조로 따로 학습해 위험점수 1개를 뽑은 뒤 ③ 두 위험점수를 fold별로 CoxPH(lifelines)에 넣어 가중합 계수를 적합 |
 | **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; `sclc.late_fusion.combine_two`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` 그리고 `--target pfs` |
@@ -120,16 +120,18 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 
 ### 3-3. late fusion 3-way (clinical·판독지·영상 각각 독립 학습 후 결합)
 
-| | 성능 |
-|---|---|
-| **OS** | 0.6811 ± ? |
-| **PFS** | 0.6313 ± ? |
-| **모델 구조** | clinical 단독(§1-1), 판독지 단독 TF-IDF(§1-2), 영상 단독(§1-3)을 **각각 완전히 독립적으로** 학습해 위험점수 3개를 뽑은 뒤, fold별로 CoxPH(lifelines)에 3개 covariate(`risk_image`, `risk_clinical`, `risk_report`)를 넣어 가중합 계수를 적합 |
-| **코드 파일** | `src/sclc/unimodal_arms.py` (`run_clinical_only`, `run_report_only`) + `sclc.late_fusion.combine_weighted_sum` — 실행은 `experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way` |
-| **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way --target os` 그리고 `--target pfs` |
-| **재현성** | image 축은 재학습 없이 `outputs/late_fusion_B/oof_{target}.json`의 저장된 OOF 위험점수를 재사용. clinical·report는 batch32/epoch60으로 새로 학습(2026-07-22의 첫 실행은 batch16/epoch30 이었음, 참고값 OS 0.6703/PFS 0.6288) |
+| | TF-IDF (brain_meta 수정 후) | RadBERT (brain_meta 수정 후) |
+|---|---|---|
+| **OS** | 0.6811 ± 0.0438 | 0.7045 ± 0.0390 |
+| **PFS** | 0.6313 ± 0.0455 | 0.6545 ± 0.0285 |
+| **모델 구조** | clinical 단독(§1-1), 판독지 단독(§1-2), 영상 단독(§1-3)을 **각각 완전히 독립적으로** 학습해 위험점수 3개를 뽑은 뒤, fold별로 CoxPH(lifelines)에 3개 covariate(`risk_image`, `risk_clinical`, `risk_report`)를 넣어 가중합 계수를 적합 |
+| **코드 파일** | `src/sclc/unimodal_arms.py` + `sclc.late_fusion.combine_weighted_sum` — 실행은 `exp_late_fusion.py three-way`(TF-IDF) 또는 `exp_fusion_methods.py`(RadBERT) |
+| **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way --target os`(TF-IDF) / `python experiments/실험12_융합방식_조건통일/exp_fusion_methods.py`(RadBERT) |
+| **재현성** | image 축은 두 조건 모두 재학습 없이 `outputs/late_fusion_B/oof_{target}.json`의 OOF 위험점수를 재사용. clinical·report는 batch32/epoch60(2026-07-22의 첫 실행은 batch16/epoch30, 참고값 OS 0.6703/PFS 0.6288) |
 
-**3-way가 2-way보다 뚜렷이 낮다(OS −0.033, PFS −0.031).** clinical과 판독지를 **각각 따로** 학습시키면 둘 다 약한데(OS 0.63대/0.62대), **하나로 묶어서 같이** 학습시키면 0.71까지 오른다 — §2-1에서 확인한 "clinical과 판독지는 함께 학습해야 서로 보완 효과가 난다"는 결과와 정확히 같은 현상이다. 판독지가 부족한 부분을 임상변수가 메워주는 상호작용은 **모델을 합쳐야만** 학습되고, 점수만 사후 결합하는 late fusion(3-way)은 이 상호작용을 못 잡는다.
+**TF-IDF 조건에서는 3-way가 2-way보다 뚜렷이 낮다(OS −0.033, PFS −0.031, 표3-2 대비).** clinical과 판독지를 **각각 따로** 학습시키면 둘 다 약한데(OS 0.63대/0.62대), **하나로 묶어서 같이** 학습시키면 0.71까지 오른다 — §2-1에서 확인한 "clinical과 판독지는 함께 학습해야 서로 보완 효과가 난다"는 결과와 정확히 같은 현상이다. 판독지가 부족한 부분을 임상변수가 메워주는 상호작용은 **모델을 합쳐야만** 학습되고, 점수만 사후 결합하는 late fusion(3-way)은 이 상호작용을 못 잡는다.
+
+**RadBERT로 통일하면 격차가 좁혀지거나(OS) 역전된다(PFS).** OS는 2-way(0.7224)가 여전히 위지만 격차가 −0.033→−0.018로 줄고, **PFS는 3-way(0.6545)가 2-way·RadBERT(0.6470)를 앞선다.** 새로운 모순이 아니다 — 표3에서 이미 "RadBERT는 다른 모달리티와 결합될 때 PFS 신호를 깎는다"(concat Δ−0.024, late+영상 Δ−0.015)가 확인돼 있고, 3-way는 각 축을 **따로** 학습해 그 결합 손실을 3-way의 두 축(clinical+report)에서는 겪지 않는다. 그래도 이 프로젝트가 PFS에 **TF-IDF 2-way(0.6621)**를 채택하는 이유는 바뀌지 않는다 — RadBERT·3-way(0.6545)보다 TF-IDF·2-way가 여전히 높다. 자세한 조건 통일 실험은 `RESULTS_TABLE_final.md` 표3-1 참고.
 
 ---
 
