@@ -214,6 +214,7 @@ MODALITY_CONFIGS = {
     "all":         dict(use_image=True,  use_clinical=True,  use_report=True),   # 3모달
     "clin_report": dict(use_image=False, use_clinical=True,  use_report=True),   # 임상+판독지
     "clin_image":  dict(use_image=True,  use_clinical=True,  use_report=False),  # 임상+영상
+    "report_image": dict(use_image=True, use_clinical=False, use_report=True),   # 판독지+영상
     "clin_only":   dict(use_image=False, use_clinical=True,  use_report=False),  # 임상만
     "report_only": dict(use_image=False, use_clinical=False, use_report=True),   # 판독지만
     "image_only":  dict(use_image=True,  use_clinical=False, use_report=False),  # 영상만

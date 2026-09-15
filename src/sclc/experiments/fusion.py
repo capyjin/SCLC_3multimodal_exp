@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from sclc import cohort
 from sclc.encoders.base import ReportEncoder
 from sclc.experiments.base import BaseExperiment, ReportCorpusMixin
-from sclc.late_fusion import combine_two
+from sclc.late_fusion import combine_risk_scores, combine_two
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.utils.logging import banner, section
 from sclc.utils.summary import Table
@@ -48,11 +48,20 @@ class Axis:
 
 @dataclass
 class Combination:
-    """CoxPH 로 묶을 축 두 개."""
+    """CoxPH 로 묶을 축 두 개.
+
+    ``coef_names`` 는 결합 CoxPH 의 공변량 이름 ``(left, right)`` 다. 기본값
+    ``None`` 이면 검증된 ``combine_two`` 경로가 그대로 돌아 이름이
+    ``risk_tabular``/``risk_image`` 로 고정된다 — 채택 모델(tabular + 영상)에는
+    맞는 이름이지만, 축 구성이 다른 실험(예: [판독지+영상] + 임상)에서는 결과
+    JSON 의 ``mean_coef`` 키가 실제 축을 잘못 가리키게 된다. 그런 실험만 이름을
+    명시한다. 계수 2개짜리 CoxPH 이므로 **이름만 달라지고 수치는 동일**하다.
+    """
     name: str
     left: str
     right: str
     desc: str = ""
+    coef_names: tuple[str, str] | None = None
 
 
 class LateFusionExperiment(ReportCorpusMixin, BaseExperiment):
@@ -135,6 +144,23 @@ class LateFusionExperiment(ReportCorpusMixin, BaseExperiment):
         return super().run_variant(name)
 
     # ── 결합 단계 ────────────────────────────────────────────────────────
+    def combine(self, combo: Combination) -> dict:
+        """축 두 개의 OOF 위험점수를 fold별 CoxPH 로 묶는다.
+
+        ``coef_names`` 가 없으면 기존 결과를 낸 ``combine_two`` 를 글자 그대로
+        쓴다(기본 경로 불변). 있으면 같은 구현인 ``combine_risk_scores`` 를
+        공변량 이름만 바꿔 부른다 — 어느 쪽이든 fold 마다 **train 환자의 OOF
+        점수로만** CoxPH 를 적합하는 누수 방지 계약은 동일하다.
+        """
+        left, right = self.oof[combo.left], self.oof[combo.right]
+        if combo.coef_names is None:
+            return combine_two(self.cohort_df, self.target, left, right)
+        lname, rname = combo.coef_names
+        return combine_risk_scores(
+            self.cohort_df, self.target, {lname: left, rname: right},
+            modality=f"late_fusion_{combo.name}", log_prefix="late/combine",
+        )
+
     def after_variants(self) -> None:
         for combo in self.build_combinations():
             missing = [t for t in (combo.left, combo.right) if t not in self.oof]
@@ -143,8 +169,7 @@ class LateFusionExperiment(ReportCorpusMixin, BaseExperiment):
                                  "(그 축을 이번에 안 돌렸다면 정상).")
                 continue
             banner(self.log, f"COMBINE {combo.name}  target={self.target}")
-            out = combine_two(self.cohort_df, self.target,
-                              self.oof[combo.left], self.oof[combo.right])
+            out = self.combine(combo)
             self.combined[combo.name] = {
                 "name": combo.name, "desc": combo.desc,
                 "axes": [combo.left, combo.right],

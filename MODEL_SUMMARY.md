@@ -116,6 +116,8 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; `sclc.late_fusion.combine_two`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` 그리고 `--target pfs` |
 
+**왜 하필 임상과 판독지를 묶었나** — 2-way 는 세 모달리티를 다 쓰되 그중 둘만 묶어 학습하므로 묶는 조합이 셋(임상+판독지 / 임상+영상 / 판독지+영상)이다. 실험13이 셋을 같은 조건에서 재 봤고, 채택한 조합이 OS 에서 나머지 둘을 앞선다(0.7224 vs 0.6894/0.6733, G2 대비 5 fold 전부 우세 p=0.010). PFS 에서는 셋이 구분되지 않는다. 표와 해석은 `RESULTS_TABLE_final.md` 표3-2.
+
 **RadBERT 버전이 OS에서 더 높은데(0.7224) 왜 TF-IDF를 채택했나** — 2-1과 같은 이유. PFS에서 TF-IDF가 크게 앞선다(0.6621 vs 0.6470). 두 타깃 동등 가중이면 TF-IDF, OS만 우선한다면 RadBERT가 방어 가능 — 이 판단 기준은 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §4.6에 정리돼 있다.
 
 ### 3-3. late fusion 3-way (clinical·판독지·영상 각각 독립 학습 후 결합)
