@@ -29,6 +29,8 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "src"))   # src 레이아웃: sclc 패키지를 import 가능하게
+
 TARGETS = ("os", "pfs")
 
 
@@ -43,7 +45,7 @@ def resolve(cfg: dict, key: str) -> str:
 
 def cmd_smoke_test(cfg: dict) -> None:
     """No-torch check: paths exist, cohort/manifest/split agree, corpus loads."""
-    from core import cohort
+    from sclc import cohort
 
     checks = []
     merged_csv = resolve(cfg, "merged_csv")
@@ -71,7 +73,7 @@ def cmd_smoke_test(cfg: dict) -> None:
         checks.append((f"fold {fold} train/val/test overlap == 0", len(overlap) == 0))
         checks.append((f"fold {fold} cohort union == {n_cohort}", len(tr | va | te) == n_cohort))
 
-    from core import features
+    from sclc import features
     corpus, _ = features.load_text_corpus(merged_csv)
     checks.append(("text corpus loads (has_report=1 patients)", len(corpus) > 0))
 
@@ -91,7 +93,7 @@ def _experiment_id(experiment: str, mode: str) -> str:
 
 
 def _write_artifacts(cfg, experiment_id, contract, fold_records_by_target, oof_by_target):
-    from core import reporting
+    from sclc import reporting
 
     output_root = resolve(cfg, "output_dir")
     dirs = reporting.prepare_experiment_dir(output_root, experiment_id)
@@ -132,7 +134,7 @@ def _base_contract(cfg: dict, experiment_id: str, targets, epochs: int, mode: st
         "manifest_path": "data_manifest.csv (this experiment folder)",
         "actual_n": 238,
         "target": list(targets),
-        "split_file": "splits/trimodal_common_5fold_seed42_v1.csv",
+        "split_file": "data/splits/trimodal_common_5fold_seed42_v1.csv",
         "split_method": "identical to clinical+report/report_common_5fold_seed42_v1.csv "
                         "(StratifiedKFold on joint OS/PFS event)",
         "n_folds": 5,
@@ -156,7 +158,7 @@ def _base_contract(cfg: dict, experiment_id: str, targets, epochs: int, mode: st
 
 def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
-    from core.train import TrimodalEvaluator
+    from sclc.train import TrimodalEvaluator
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
     max_folds = 1 if mode == "batch_smoke" else None
@@ -207,9 +209,9 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
                              "Adam lr=1e-4 wd=1e-4, batch=16, epochs=30, seed=42, 5-fold.",
         "unavoidable_changes": "Cohort is 238 (tri-modal common) vs 257 (image+clinical baseline) or "
                                 "238 (report_common) individually -- same n as report_common by construction.",
-        "model": "ConcatDeepSurv, all three branches on (core/model.py)",
+        "model": "ConcatDeepSurv, all three branches on (src/sclc/model.py)",
         "freeze_policy": "none -- all branches trained end-to-end",
-        "loss": "Cox negative partial log-likelihood (core.train.cox_ph_loss)",
+        "loss": "Cox negative partial log-likelihood (sclc.train.cox_ph_loss)",
         "early_stopping": "none (best-val-C-index checkpoint selection, matching clinical+image/train.py)",
         "checkpoint_rule": "save state_dict whenever val C-index improves; reload best before test evaluation",
         "secondary_metrics": ["train/val C-index gap", "fold std", "OOF pooled C-index"],
@@ -219,11 +221,8 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
 
 def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
-    from core import cohort
-    from core import fusion_stack
-
-    sys.path.insert(0, str(ROOT / "실험1_기본융합_early_late"))
-    import late_fusion_3modal as lf
+    from sclc import cohort, fusion_stack
+    from sclc import fusion_arms as lf   # 옛 실험1/late_fusion_3modal.py 에서 승격
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
     max_folds = 1 if mode == "batch_smoke" else None
@@ -297,7 +296,7 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         "unavoidable_changes": "Each unimodal arm has its own risk-score scale before combination; the "
                                 "combiner is fit fold-wise on OOF risk (not on raw features).",
         "model": "ImageOnlyDeepSurv + generate_net(clinical) + generate_net(report) "
-                 "+ lifelines CoxPHFitter combiner (core/fusion_stack.py)",
+                 "+ lifelines CoxPHFitter combiner (src/sclc/fusion_stack.py)",
         "freeze_policy": "none; each unimodal arm trained independently, combiner fit on frozen OOF risk scores",
         "loss": "Cox negative partial log-likelihood per unimodal arm; CoxPHFitter partial likelihood for the combiner",
         "optimizer": "Adam (unimodal arms); Newton-Raphson (lifelines CoxPHFitter combiner)",
@@ -313,7 +312,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--experiment", choices=("early_fusion", "late_fusion"), required=True)
     ap.add_argument("--mode", choices=("smoke_test", "batch_smoke", "train"), default="smoke_test")
     ap.add_argument("--target", choices=("os", "pfs", "all"), default="all")
-    ap.add_argument("--config", default=str(ROOT / "config.yaml"))
+    ap.add_argument("--config", default=str(ROOT / "configs" / "config.yaml"))
     return ap.parse_args()
 
 

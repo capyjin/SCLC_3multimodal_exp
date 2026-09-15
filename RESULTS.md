@@ -43,7 +43,7 @@
 10. **★[교수님 질문에 대한 답] late fusion에서 OS만 오르고 PFS는 떨어지는 이유 = "이미지에 PFS 고유 정보가 없기 때문" (섹션 10).** CoxPH가 이미지에 준 가중치 β를 직접 검정했더니 **OS는 β=+0.322 (p=0.008, 5/5 fold 양수)로 확실한 신호**인 반면 **PFS는 β=+0.008 (p=0.948, 부호가 fold마다 뒤집힘)로 0과 구분 불가**. 우도비 검정도 OS χ²=6.69(p=0.010) vs **PFS χ²=0.00(p=0.948)** — 이미지가 더한 정보량이 문자 그대로 0. 결정적으로 **이미지 점수를 난수로 바꿔 200번 돌려보니, OS는 난수가 단 한 번도 못 이겼고(0/200) PFS는 난수가 73%(146/200) 이겼다.** 왜 "제자리"가 아니라 "하락"인가? 결합 모델은 쓸모없는 변수라도 **가중치를 추정해야 하는 비용**을 치르기 때문 — **정보가 0인 난수를 넣어도 0.668 → 0.658로 깎인다**(진짜 이미지 0.653은 난수 분포 95% 구간 [0.644, 0.670] **안**에 위치 = 난수와 구분 불가). 근거 문헌: **Harrell, Lee & Mark, *Stat Med* 1996 (피인용 9,856)** — Cox 예후모델의 과적합·shrinkage 고전. ⚠️ **초안의 "PFS가 더 중복이라서"는 오류**(fold를 섞어 계산한 artifact); fold 내부 상관은 OS 0.459 / PFS 0.468로 **거의 같음**(중간 정도 상관).
 11. **섹션 9와 섹션 10은 서로 다른 문제 — 섞지 말 것.** 섹션 9(**concat**)는 "섞는 방법의 문제"(이미지가 발언권 독점 → OS·PFS 둘 다 −0.030)이고 fusion을 바꾸면 해결됨(실제로 late fusion에서 OS 0.722로 회복). 섹션 10(**late**)의 PFS 문제는 "**재료의 문제**"(이미지에 PFS 정보가 없음)이라 **fusion을 아무리 개선해도 해결 불가.** → PFS에서 영상을 살리려면 fusion 기법이 아니라 **영상에서 다른 정보를 뽑아야 함**(치료 전후 변화량, radiomics 등).
 12. **발언권을 고치려는 시도 세 갈래 — 전부 실패 (섹션 9.7).** ⓐ 브랜치에 학습되는 "음량 손잡이" 추가 → **손잡이가 1.0에서 안 움직임**(6개 실험 전부). 선형 head와 **수학적으로 중복**이라 무효. ⓑ 판독지 차원 확대(16→64/128) → 이미지 없는 조건에서도 **떨어짐**(0.668→0.629/0.653), 과적합만 늘어남. ⓒ 학습 중 이미지 gradient 감쇠(OGM-GE) → 배치 69~80%에서 0.53~0.72배로 눌렀으나 **발언권 46.1%→46.0% 불변**, 성능도 유의한 개선 없음(전부 p>0.16). **10개 변형 중 목표선(clin+report 0.708/0.668, late fusion 0.722)을 넘은 것이 없다.**
-13. **세 실패가 남긴 두 가지 교훈.** ⑴ **ⓐ의 실패가 9.4 진단을 확정했다** — 모델에게 줄일 권한을 새로 줘도 안 쓰므로, "줄일 수 없어서"가 아니라 **"줄이고 싶지 않아서"** 다(= 구조가 아니라 최적화 문제, modality competition). ⑵ **ⓒ의 실패로 알게 된 것** — gradient 감쇠는 학습 **"속도"만** 늦추고 **"도착지"는 못 바꾼다**(60 epoch면 천천히라도 같은 곳에 도착). 그래서 **late fusion이 성공한 이유**도 설명된다: 학습 트릭이 아니라 **가중치를 정하는 기준 자체가 달랐다**(훈련 데이터가 아닌 out-of-fold로 판단 → 이미지 0.30 대 tabular 4.44). → 다음은 **손실 함수를 바꾸는 방향**(head 이미지 몫에 직접 벌점) 또는 **입력의존 게이트(GMU)**. 상세: [RESULTS_ogm_ge.md](실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
+13. **세 실패가 남긴 두 가지 교훈.** ⑴ **ⓐ의 실패가 9.4 진단을 확정했다** — 모델에게 줄일 권한을 새로 줘도 안 쓰므로, "줄일 수 없어서"가 아니라 **"줄이고 싶지 않아서"** 다(= 구조가 아니라 최적화 문제, modality competition). ⑵ **ⓒ의 실패로 알게 된 것** — gradient 감쇠는 학습 **"속도"만** 늦추고 **"도착지"는 못 바꾼다**(60 epoch면 천천히라도 같은 곳에 도착). 그래서 **late fusion이 성공한 이유**도 설명된다: 학습 트릭이 아니라 **가중치를 정하는 기준 자체가 달랐다**(훈련 데이터가 아닌 out-of-fold로 판단 → 이미지 0.30 대 tabular 4.44). → 다음은 **손실 함수를 바꾸는 방향**(head 이미지 몫에 직접 벌점) 또는 **입력의존 게이트(GMU)**. 상세: [RESULTS_ogm_ge.md](experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
 
 ---
 
@@ -134,7 +134,7 @@
 ## 4. 진단 ②: 왜 clinical+report가 0.687밖에 안 되나? → batch=16 Cox 핸디캡
 
 Cox 부분우도가 **미니배치 16명 안에서만** risk set을 구성 → tabular 학습이 불리
-([core/train.py:47](core/train.py#L47), [core/train.py:239](core/train.py#L239)). 512² 이미지 메모리 때문에
+([src/sclc/train.py:47](src/sclc/train.py#L47), [src/sclc/train.py:239](src/sclc/train.py#L239)). 512² 이미지 메모리 때문에
 batch=16이 강제되지만, 원본 tabular 모델은 훨씬 큰 risk set으로 학습됨.
 
 **batch sweep (clin+report, 30 epoch 고정):** 16→0.687, 32→**0.693**, 64→0.667, 128→0.650, 256→0.560.
@@ -236,20 +236,20 @@ outputs/batch_sweep/, outputs/regime/      # batch·regime 실험
 report_assets/                             # fig1, fig4~fig12 그래프
 
 # 재현 스크립트 (실험별 폴더 · 전체 지도는 코드_구조.md)
-실험3_모달리티_절제실험/ablation.py                       # 브랜치 ablation (섹션 3·5·9.3)
-    python 실험3_모달리티_절제실험/ablation.py --target os --batch_size 32 --epochs 60
-실험2_학습조건_배치크기진단/batch_sweep.py                # batch sweep (섹션 4)
-실험2_학습조건_배치크기진단/regime_test.py                # 스텝 매칭 regime test (섹션 4)
-실험1_기본융합_early_late/late_fusion_tab_image.py        # late fusion method B: tabular + image (섹션 8)
-실험4_영상_발언권독점_진단/analyze_contribution.py        # 모달리티별 기여도(발언권) 측정 (섹션 9.4)
-실험4_영상_발언권독점_진단/analyze_redundancy.py          # 모달리티 간 정보 중복(상관) 측정 (섹션 9.5)
-실험5_late융합_영상기여도_검정/analyze_late_fusion_pfs.py # late fusion 이미지 기여도 검정 (섹션 10)
-도구/plot_all_figures.py                                  # fig1, fig4~fig12 그래프 생성
+experiments/실험3_모달리티_절제실험/ablation.py                       # 브랜치 ablation (섹션 3·5·9.3)
+    python experiments/실험3_모달리티_절제실험/ablation.py --target os --batch_size 32 --epochs 60
+experiments/실험2_학습조건_배치크기진단/batch_sweep.py                # batch sweep (섹션 4)
+experiments/실험2_학습조건_배치크기진단/regime_test.py                # 스텝 매칭 regime test (섹션 4)
+experiments/실험1_기본융합_early_late/exp_late_fusion.py            # late fusion 학습 3종: method-b(섹션 8)/three-way/seed-sweep
+experiments/실험4_영상_발언권독점_진단/analyze_contribution.py        # 모달리티별 기여도(발언권) 측정 (섹션 9.4)
+experiments/실험4_영상_발언권독점_진단/analyze_redundancy.py          # 모달리티 간 정보 중복(상관) 측정 (섹션 9.5)
+experiments/실험1_기본융합_early_late/analyze_late_fusion.py  # late fusion 분석 5종: contribution(섹션 10)/shuffle-sanity/seed-sweep/seed-ensemble/variant-followup
+tools/plot_all_figures.py                                  # fig1, fig4~fig12 그래프 생성
 ```
 
 > ⚠️ 예전의 `generate_report.py` 는 **삭제**했다. 그림 외에 이 RESULTS.md 를 통째로
 > 덮어쓰는 기능이 있었는데, 이 문서는 그 뒤 손으로 크게 확장돼서 실행하면 내용이
-> 날아가는 함정이었다. 아직 쓰이는 그림(fig1)만 `도구/plot_all_figures.py` 로 옮겼다.
+> 날아가는 함정이었다. 아직 쓰이는 그림(fig1)만 `tools/plot_all_figures.py` 로 옮겼다.
 
 ---
 
@@ -289,7 +289,7 @@ report_assets/                             # fig1, fig4~fig12 그래프
 
 - OS는 late fusion + SimpleCNN이 최고. **ResNet은 불필요**(도메인 불일치로 오히려 약함).
 - PFS는 이미지가 도움 안 되므로 tabular 단독 사용.
-- 재현: `python 실험1_기본융합_early_late/late_fusion_tab_image.py --targets os,pfs` → `outputs/late_fusion_B/results.json`, 그래프 `python 도구/plot_all_figures.py --only fig6`.
+- 재현: `python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs` → `outputs/late_fusion_B/results.json`, 그래프 `python tools/plot_all_figures.py --only fig6`.
 
 ---
 
@@ -343,10 +343,10 @@ report_assets/                             # fig1, fig4~fig12 그래프
 
 **공정한 비교를 위해 고정한 것 (통제 변인)**
 
-- 같은 환자 238명, 같은 5-fold 분할 (`splits/trimodal_common_5fold_seed42_v1.csv`)
+- 같은 환자 238명, 같은 5-fold 분할 (`data/splits/trimodal_common_5fold_seed42_v1.csv`)
 - 같은 학습 루프·같은 하이퍼파라미터: **batch 32, 60 epoch** (섹션 5에서 가장 좋았던 조건)
 - **fusion 방식을 concat(early)으로 고정**
-- 같은 랜덤 시드. **오직 브랜치를 켜고 끄는 것만** 다름 ([실험3_모달리티_절제실험/ablation.py](실험3_모달리티_절제실험/ablation.py))
+- 같은 랜덤 시드. **오직 브랜치를 켜고 끄는 것만** 다름 ([experiments/실험3_모달리티_절제실험/ablation.py](experiments/실험3_모달리티_절제실험/ablation.py))
 
 > ⚠️ **주의 — 섹션 8의 0.722와 헷갈리지 말 것.**
 > 이 섹션의 모든 수치는 **concat(early) fusion 한정**이다. 섹션 8의 **OS 0.722는 late
@@ -413,7 +413,7 @@ report_assets/                             # fig1, fig4~fig12 그래프
 ### 9.4 결과 ② — 원인 규명: "발언권"과 "실력"의 불일치
 
 가장 중요한 실험이다. **"모델이 최종 판단을 내릴 때 각 모달리티의 말을 얼마나 듣는가"** 를
-측정했다 ([실험4_영상_발언권독점_진단/analyze_contribution.py](실험4_영상_발언권독점_진단/analyze_contribution.py)).
+측정했다 ([experiments/실험4_영상_발언권독점_진단/analyze_contribution.py](experiments/실험4_영상_발언권독점_진단/analyze_contribution.py)).
 
 측정 방법: 각 모달리티가 만들어낸 위험점수 기여분의 **표준편차**(환자마다 점수를 얼마나
 흔드는지)를 계산해 비율로 환산했다.
@@ -520,7 +520,7 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 - 즉 발언권 46%는 **`image_proj_dim=128` vs `report_hidden=(32,16)`이라는 설계 선택의 결과**다.
 
 **그래서 직접 실험했다 — 이미지 칸을 판독지와 같은 16으로 줄이면?**
-([실험4_영상_발언권독점_진단/exp_balance_dims.py](실험4_영상_발언권독점_진단/exp_balance_dims.py), `outputs/balance_dims/`)
+([experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py](experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py), `outputs/balance_dims/`)
 
 **표 9-4c. `image_proj_dim` 128 → 16 (다른 조건 전부 고정)**
 
@@ -568,7 +568,7 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 
 **(b) "이미지와 판독지가 같은 정보라 중복이다" → 약하게만 지지**
 
-단독 모델들이 매긴 위험점수의 순위상관 ([실험4_영상_발언권독점_진단/analyze_redundancy.py](실험4_영상_발언권독점_진단/analyze_redundancy.py), PFS, 238명 OOF):
+단독 모델들이 매긴 위험점수의 순위상관 ([experiments/실험4_영상_발언권독점_진단/analyze_redundancy.py](experiments/실험4_영상_발언권독점_진단/analyze_redundancy.py), PFS, 238명 OOF):
 
 | 모달리티 쌍 | Spearman | p |
 |---|---|---|
@@ -706,7 +706,7 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 > 로 판단해서 이미지에 tabular의 15분의 1(0.30 대 4.44)만 부여했다.
 > 따라서 학습 트릭으로는 흉내낼 수 없다.
 
-자세한 내용: [RESULTS_ogm_ge.md](실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
+자세한 내용: [RESULTS_ogm_ge.md](experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
 
 #### 9.7.4 세 시도의 성능 전체 표
 
@@ -770,33 +770,33 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 
 ```bash
 # ① 6가지 조합 × 2개 타깃 학습 (각 ~40분, RTX 4070 Ti SUPER 기준)  — 9.3
-python 실험3_모달리티_절제실험/ablation.py --target pfs --epochs 60 --batch_size 32 --tag _why_pfs
-python 실험3_모달리티_절제실험/ablation.py --target os  --epochs 60 --batch_size 32 --tag _why_pfs
+python experiments/실험3_모달리티_절제실험/ablation.py --target pfs --epochs 60 --batch_size 32 --tag _why_pfs
+python experiments/실험3_모달리티_절제실험/ablation.py --target os  --epochs 60 --batch_size 32 --tag _why_pfs
 
 # ② 모달리티별 기여도(발언권) 측정 — clin_report, clin_image, all 3개 조합  — 9.4
-T=pfs python 실험4_영상_발언권독점_진단/analyze_contribution.py
-T=os  python 실험4_영상_발언권독점_진단/analyze_contribution.py
+T=pfs python experiments/실험4_영상_발언권독점_진단/analyze_contribution.py
+T=os  python experiments/실험4_영상_발언권독점_진단/analyze_contribution.py
 
 # ③ 모달리티 간 정보 중복(상관) 측정  — 9.5
-python 실험4_영상_발언권독점_진단/analyze_redundancy.py
+python experiments/실험4_영상_발언권독점_진단/analyze_redundancy.py
 
 # ④ 구조 수정 시도 A·B (10개 변형, 각 타깃 ~90분)  — 9.7.1, 9.7.2
-python 실험4_영상_발언권독점_진단/exp_fusion_fix.py --target pfs
-python 실험4_영상_발언권독점_진단/exp_fusion_fix.py --target os
+python experiments/실험4_영상_발언권독점_진단/exp_fusion_fix.py --target pfs
+python experiments/실험4_영상_발언권독점_진단/exp_fusion_fix.py --target os
 
 # ⑤ 학습 전략 시도 C (OGM-GE)  — 9.7.3
 # ⚠️ exp_ogm_ge.py 는 저장소에 없다(정리 시 삭제). 아래는 당시 실행한 명령의 기록이며,
-#    결과는 outputs/ogm_ge/ 와 실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md 에 남아 있다.
+#    결과는 outputs/ogm_ge/ 와 experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md 에 남아 있다.
 python exp_ogm_ge.py --target os  --alpha 0.5
 python exp_ogm_ge.py --target os  --alpha 0.5 --damp_head
 python exp_ogm_ge.py --target pfs --alpha 0.5
 
 # ⑥ 발언권이 차원 배분 탓인지 검증 (9.4.2)
-python 실험4_영상_발언권독점_진단/exp_balance_dims.py --target os  --variants img16
-python 실험4_영상_발언권독점_진단/exp_balance_dims.py --target pfs --variants img16
+python experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py --target os  --variants img16
+python experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py --target pfs --variants img16
 
 # ⑦ 그래프 생성
-python 도구/plot_all_figures.py --only fig7,fig8,fig9
+python tools/plot_all_figures.py --only fig7,fig8,fig9
 ```
 
 **산출물**
@@ -857,7 +857,7 @@ late fusion은 두 단계로 동작한다.
 - β_B가 **0이면** → 이미지가 아무 기여도 안 한다는 뜻
 
 그래서 "이미지가 PFS에 도움이 되는가?"는 **β_B가 0과 다른지 통계적으로 검정하면 바로 답이
-나온다.** 아래가 그 검정 결과다. ([실험5_late융합_영상기여도_검정/analyze_late_fusion_pfs.py](실험5_late융합_영상기여도_검정/analyze_late_fusion_pfs.py))
+나온다.** 아래가 그 검정 결과다. ([experiments/실험1_기본융합_early_late/analyze_late_fusion.py](experiments/실험1_기본융합_early_late/analyze_late_fusion.py) `contribution`)
 
 ---
 
@@ -966,7 +966,7 @@ PFS:  0.668   tabular 단독 (추정할 가중치 1개)
 #### 10.5.1 "섞은 것(0.658)보다 진짜(0.653)가 더 낮은 게 말이 되나?" ★자주 나오는 질문
 
 당연히 이상해 보인다. 정보가 있는 진짜 이미지가 무정보 잡음보다 못하다니? 두 가지를 검정했다.
-([실험5_late융합_영상기여도_검정/analyze_collinearity.py](실험5_late융합_영상기여도_검정/analyze_collinearity.py))
+([experiments/실험5_late융합_영상기여도_검정/analyze_collinearity.py](experiments/실험5_late융합_영상기여도_검정/analyze_collinearity.py))
 
 **의심 ①: 진짜 이미지는 tabular와 겹치니까, 겹침이 좋은 변수를 방해한 것 아닐까?**
 
@@ -1068,7 +1068,7 @@ PFS에서는 tabular가 틀리는 환자에 대해 이미지도 **같이 틀린�
 
 > 두 값 모두 `outputs/late_fusion_B/pfs_diagnosis.json`의
 > `risk_correlation_within_fold` / `risk_correlation` 항목에 저장되어 있으며,
-> `python 실험5_late융합_영상기여도_검정/analyze_late_fusion_pfs.py`로 재현된다.
+> `python experiments/실험1_기본융합_early_late/analyze_late_fusion.py contribution`로 재현된다.
 
 > ⚠️ **정정 기록:** 초안에서는 "PFS는 이미지↔tabular 상관이 더 높아서(0.586 vs 0.482) 중복이
 > 심하다"고 적었으나, 이는 **fold를 섞어 계산한 오류**였다. fold 안에서 다시 계산하면
@@ -1170,10 +1170,10 @@ PFS에서는 tabular가 틀리는 환자에 대해 이미지도 **같이 틀린�
 
 ```bash
 # 저장된 체크포인트에서 OOF 위험점수를 되살려 4가지 검정을 수행 (~4분, 재학습 없음)
-python 실험5_late융합_영상기여도_검정/analyze_late_fusion_pfs.py
+python experiments/실험1_기본융합_early_late/analyze_late_fusion.py contribution
 
 # 그래프
-python 도구/plot_all_figures.py --only fig10,fig11,fig12
+python tools/plot_all_figures.py --only fig10,fig11,fig12
 ```
 
 **산출물**

@@ -1,7 +1,10 @@
 # Patient medical data -- MUST NOT be published to the remote (clinical
 # records, PET-CT images, radiology report text). Kept locally only;
-# config.yaml/cohort.py resolve these paths relative to the repo root.
-DATA/
+# configs/config.yaml + src/sclc/paths.py resolve these relative to the repo root.
+# data/* (not data/) so the fold assignment under data/splits/ can be re-included --
+# git cannot re-include a file whose parent directory is excluded.
+data/*
+!data/splits/
 
 # Training outputs (checkpoints, OOF predictions, logs) are runtime
 # artifacts, not source -- regenerate via main.py.

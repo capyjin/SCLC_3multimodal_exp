@@ -1,0 +1,23 @@
+# src 레이아웃 패키지 정의.
+#
+# 설치는 **선택**이다. 실험 스크립트는 파일 맨 위 2줄 앵커로 <repo>/src 를
+# sys.path 에 넣으므로 설치 없이도 그대로 돌아간다. 다만
+#     pip install -e .
+# 를 해 두면 앵커 없이도 어디서든 `import sclc` 가 되고,
+# `python -m sclc.cohort` 같은 자기점검을 repo 밖에서도 실행할 수 있다.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sclc"
+version = "0.1.0"
+description = "SCLC PET-CT tri-modal (image + clinical + report) survival modelling"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
