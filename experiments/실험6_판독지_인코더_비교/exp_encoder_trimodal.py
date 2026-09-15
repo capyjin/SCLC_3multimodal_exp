@@ -13,7 +13,7 @@ concat 단계에서는 이미 RadBERT 가 앞선다(0.7153 vs 0.7076) — 그럼
 
   두 결합 결과의 차이가 곧 "인코더 교체의 순효과"다.
 
-누수 방지: 검증된 ``sclc.fusion_stack.combine_two`` 를 그대로 쓴다
+누수 방지: 검증된 ``sclc.late_fusion.combine_two`` 를 그대로 쓴다
   (fold 마다 train 환자의 OOF 점수로만 CoxPH 적합).
 
 Run:  python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os
@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 from sclc.encoders import build_encoder
 from sclc.experiments.fusion import Axis, Combination, LateFusionExperiment
-from sclc.fusion_stack import get_image_oof_simplecnn
+from sclc.late_fusion import get_image_oof_simplecnn
 
 # 현재 최고 (late fusion + SimpleCNN). 결합 결과를 이 값과 대조한다.
 KNOWN_BEST = {"os": 0.7221, "pfs": 0.6678}

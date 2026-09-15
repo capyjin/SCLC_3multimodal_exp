@@ -11,7 +11,7 @@
 앞뒤 20~30줄이 같았고(코호트 로딩 · labels 인덱싱 · fold_plan · JSON 저장),
 ``fold별 C-index`` 와 ``CoxPH stack`` 을 각자 다시 구현하고 있었다. 지금은
 그 배관이 ``sclc.experiments.analysis.BaseAnalysis`` 에, 계산 원자가
-``sclc.fusion_diag`` 에 있고, 여기 남은 것은 **각 분석이 무엇을 재는가**뿐이다.
+``sclc.late_fusion_tests`` 에 있고, 여기 남은 것은 **각 분석이 무엇을 재는가**뿐이다.
 
 [모든 분석이 공유하는 규율]
   · fold 안에서만 비교한다 (fold 마다 위험점수 척도가 다르다 — 실험9 함정).
@@ -31,10 +31,10 @@ import json
 import numpy as np
 from scipy import stats
 
-from sclc import fusion_diag, paths
+from sclc import late_fusion_tests, paths
 from sclc.experiments.analysis import BaseAnalysis, TargetLoopAnalysis, dispatch
-from sclc.fusion_stack import combine_two, load_oof_cache, oof_cache_path, save_oof_cache
-from sclc.metrics import cindex, fold_cindices, fold_mean_cindex, paired_pvalues
+from sclc.late_fusion import combine_two, load_oof_cache, oof_cache_path, save_oof_cache
+from sclc.evaluation import cindex, fold_cindices, fold_mean_cindex, paired_pvalues
 from sclc.utils.cli import comma_list
 from sclc.utils.summary import Table
 
@@ -56,7 +56,7 @@ class LateFusionOofMixin:
         if os.path.exists(oof_cache_path(target, self.out_dir)):
             return load_oof_cache(target, self.out_dir)
 
-        from sclc.fusion_stack import (get_image_oof_simplecnn, get_tabular_oof, oof_dict)
+        from sclc.late_fusion import (get_image_oof_simplecnn, get_tabular_oof, oof_dict)
         self.log.info(f"[oof] 캐시 없음 -> 체크포인트로 예측만 재생성한다 (target={target}).")
         tab = get_tabular_oof(target, epochs=0, batch_size=32, seed=42, out_dir=self.out_dir)
         img = get_image_oof_simplecnn(target, epochs=0, batch_size=16, seed=42, out_dir=self.out_dir)
@@ -108,7 +108,7 @@ class ImageContribution(LateFusionOofMixin, TargetLoopAnalysis):
         res = {"target": target}
 
         # ── ① fold별 β_img ────────────────────────────────────────────────
-        rows = fusion_diag.coef_per_fold(risks, labels, plan, target, covariate=IMG)
+        rows = late_fusion_tests.coef_per_fold(risks, labels, plan, target, covariate=IMG)
         coefs = np.array([r["coef"] for r in rows])
         res["beta_img_per_fold"] = rows
         res["beta_img_mean"] = float(coefs.mean())
@@ -116,11 +116,11 @@ class ImageContribution(LateFusionOofMixin, TargetLoopAnalysis):
         res["beta_img_significant_folds"] = int(sum(1 for r in rows if r["p"] < 0.05))
 
         # ── ② 우도비 검정 (전체 238명 OOF, pooled) ────────────────────────
-        full = fusion_diag.risk_frame(risks, ids_all, labels, target)
-        lrt = fusion_diag.likelihood_ratio_test(full, [TAB], [TAB, IMG])
+        full = late_fusion_tests.risk_frame(risks, ids_all, labels, target)
+        lrt = late_fusion_tests.likelihood_ratio_test(full, [TAB], [TAB, IMG])
         res["lrt"] = {"stat": lrt["stat"], "df": lrt["df"], "p": lrt["p"],
                       "ll_tabular": lrt["ll_reduced"], "ll_both": lrt["ll_full"]}
-        pooled = fusion_diag.coef_summary(full, IMG)
+        pooled = late_fusion_tests.coef_summary(full, IMG)
         res["beta_img_pooled"] = {k: pooled[k] for k in ("coef", "lo", "hi", "p")}
 
         # ── ③ 두 위험점수의 상관 ──────────────────────────────────────────
@@ -143,22 +143,22 @@ class ImageContribution(LateFusionOofMixin, TargetLoopAnalysis):
         rt, ri = full[TAB].to_numpy(), full[IMG].to_numpy()
         res["cindex_tabular"] = cindex(dur, rt, evt)
         res["cindex_image"] = cindex(dur, ri, evt)
-        res["image_rescue_rate"] = fusion_diag.rescue_rate(dur, evt, rt, ri)
+        res["image_rescue_rate"] = late_fusion_tests.rescue_rate(dur, evt, rt, ri)
 
         # ── ⑤ 난수 대조군 ─────────────────────────────────────────────────
         # late fusion 파이프라인을 그대로 돌리되 영상 위험점수만 무작위로 섞는다.
         # 진짜 영상이 난수와 성능이 같다면, 영상은 정보가 아니라 잡음만 준다.
         def stack_with(image_map) -> float:
-            return fusion_diag.stack_mean_cindex({TAB: risks[TAB], IMG: image_map},
+            return late_fusion_tests.stack_mean_cindex({TAB: risks[TAB], IMG: image_map},
                                                  labels, plan, target)
 
         res["stack_real_image"] = stack_with(risks[IMG])
-        res["stack_tabular_only"] = fusion_diag.stack_mean_cindex(risks, labels, plan,
+        res["stack_tabular_only"] = late_fusion_tests.stack_mean_cindex(risks, labels, plan,
                                                                   target, names=[TAB])
-        draws = fusion_diag.permutation_draws(ids_all, risks[IMG], stack_with,
+        draws = late_fusion_tests.permutation_draws(ids_all, risks[IMG], stack_with,
                                               n_repeat=self.args.n_permutation,
                                               seed=self.args.permutation_seed)
-        res["stack_shuffled_image"] = fusion_diag.null_block(draws, res["stack_real_image"])
+        res["stack_shuffled_image"] = late_fusion_tests.null_block(draws, res["stack_real_image"])
         return res
 
     def report_target(self, target: str, r: dict) -> None:
@@ -225,7 +225,7 @@ class ShuffleSanity(LateFusionOofMixin, TargetLoopAnalysis):
         def score_fn(m):
             return fold_mean_cindex(m, labels, plan, target)
 
-        draws = fusion_diag.permutation_draws(self.patient_ids(), scores["image"], score_fn,
+        draws = late_fusion_tests.permutation_draws(self.patient_ids(), scores["image"], score_fn,
                                               n_repeat=self.args.n_repeat, seed=self.args.seed)
         return {
             "tabular_only": score_fn(scores["tabular"]),
@@ -542,9 +542,9 @@ class SeedEnsemble(TargetLoopAnalysis):
             arm["expected_folds"] = np.mean(arm["per_seed_folds"], axis=0).tolist()
 
         res = {"individual": ind, "ensemble": {}}
-        for mode in fusion_diag.NORMALIZE_MODES:
-            ens_t = fusion_diag.ensemble_risks(tab_seeds, plan, mode)
-            ens_i = fusion_diag.ensemble_risks(img_seeds, plan, mode)
+        for mode in late_fusion_tests.NORMALIZE_MODES:
+            ens_t = late_fusion_tests.ensemble_risks(tab_seeds, plan, mode)
+            ens_i = late_fusion_tests.ensemble_risks(img_seeds, plan, mode)
             t_folds = fold_cindices(ens_t, labels, plan, target)
             i_folds = fold_cindices(ens_i, labels, plan, target)
             comb = combine_two(self.cohort_df, target, ens_t, ens_i)
@@ -572,7 +572,7 @@ class SeedEnsemble(TargetLoopAnalysis):
             a = ind[arm]
             log.info(f"  {arm:<8} seed{self.seeds[0]}={a['per_seed'][0]:.4f}  "
                      f"개별평균={a['mean']:.4f}±{a['sd']:.4f}")
-        for mode in fusion_diag.NORMALIZE_MODES:
+        for mode in late_fusion_tests.NORMALIZE_MODES:
             e = d["ensemble"][mode]
             pt, pl = e["paired_vs_expected"]["tabular"], e["paired_vs_expected"]["late"]
             log.info(f"   [{mode:>4}] tabular={e['tabular']['mean']:.4f} "

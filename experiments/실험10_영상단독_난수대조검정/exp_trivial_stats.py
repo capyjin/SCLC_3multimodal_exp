@@ -43,7 +43,7 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 from sclc import cohort  # noqa: E402
 from sclc.dataset import INVERTED_IMAGE_IDS  # noqa: E402
-from sclc.metrics import cindex  # noqa: E402
+from sclc.evaluation import cindex  # noqa: E402
 from sclc.train import fold_plan  # noqa: E402
 
 FEATURES = ("w", "h", "mean", "std", "frac_hot", "frac_dark")

@@ -6,7 +6,7 @@
 찍었다. 같은 저장소의 두 표가 서로 다른 기준으로 "좋아졌다"를 판정하고 있었다.
 여기서는 기준선이 있으면 항상 delta + 개선 fold 수 + p 값을 같이 낸다.
 """
-from sclc.metrics import paired_pvalues
+from sclc.evaluation import paired_pvalues
 
 
 class Table:

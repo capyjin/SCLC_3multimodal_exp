@@ -15,7 +15,7 @@
 ## 왜 옮겼나
 late fusion 코드가 실험1·5·7 세 폴더에 9개 파일로 흩어져 있었고, 그중
 "fold별 C-index" 와 "fold별 CoxPH stack" 을 파일마다 다시 구현하고 있었다.
-계산 원자는 `src/sclc/fusion_diag.py` 로, 분석 스크립트의 공통 배관은
+계산 원자는 `src/sclc/late_fusion_tests.py` 로, 분석 스크립트의 공통 배관은
 `src/sclc/experiments/analysis.py` 의 `BaseAnalysis` 로 올리고, 분석 5개를
 실험1 폴더의 `analyze_late_fusion.py` 한 파일에 서브커맨드로 모았다.
 자세한 내용은 저장소 루트의 `코드_구조.md` §"3차 정리".

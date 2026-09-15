@@ -221,8 +221,8 @@ def cmd_early_fusion(cfg: dict, mode: str, target_arg: str) -> None:
 
 def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
     import torch
-    from sclc import cohort, fusion_stack
-    from sclc import fusion_arms as lf   # 옛 실험1/late_fusion_3modal.py 에서 승격
+    from sclc import cohort, late_fusion
+    from sclc import unimodal_arms as lf   # 옛 실험1/late_fusion_3modal.py 에서 승격
 
     targets = TARGETS if target_arg == "all" else (target_arg,)
     max_folds = 1 if mode == "batch_smoke" else None
@@ -262,11 +262,11 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         oof = list(image_res["oof_predictions"]) + list(clinical_res["oof_predictions"]) + list(report_res["oof_predictions"])
 
         if max_folds is None:
-            combined = fusion_stack.combine_weighted_sum(
+            combined = late_fusion.combine_weighted_sum(
                 cohort_df, target,
-                fusion_stack.oof_dict(image_res["oof_predictions"]),
-                fusion_stack.oof_dict(clinical_res["oof_predictions"]),
-                fusion_stack.oof_dict(report_res["oof_predictions"]),
+                late_fusion.oof_dict(image_res["oof_predictions"]),
+                late_fusion.oof_dict(clinical_res["oof_predictions"]),
+                late_fusion.oof_dict(report_res["oof_predictions"]),
                 max_folds=max_folds,
             )
             fold_records += combined["fold_records"]
@@ -296,7 +296,7 @@ def cmd_late_fusion(cfg: dict, mode: str, target_arg: str) -> None:
         "unavoidable_changes": "Each unimodal arm has its own risk-score scale before combination; the "
                                 "combiner is fit fold-wise on OOF risk (not on raw features).",
         "model": "ImageOnlyDeepSurv + generate_net(clinical) + generate_net(report) "
-                 "+ lifelines CoxPHFitter combiner (src/sclc/fusion_stack.py)",
+                 "+ lifelines CoxPHFitter combiner (src/sclc/late_fusion.py)",
         "freeze_policy": "none; each unimodal arm trained independently, combiner fit on frozen OOF risk scores",
         "loss": "Cox negative partial log-likelihood per unimodal arm; CoxPHFitter partial likelihood for the combiner",
         "optimizer": "Adam (unimodal arms); Newton-Raphson (lifelines CoxPHFitter combiner)",

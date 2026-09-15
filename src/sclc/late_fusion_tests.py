@@ -4,7 +4,7 @@
 [왜 이 모듈이 따로 있나]
   late fusion 을 검증하는 코드는 학습 코드와 성질이 다르다. 재학습이 없고
   (캐시된 OOF 만 읽는다), 수백 번 반복되며(순열검정 200회), 그래서 **조용해야
-  한다**. ``fusion_stack.combine_risk_scores`` 는 fold 마다 계수를 출력하는데,
+  한다**. ``late_fusion.combine_risk_scores`` 는 fold 마다 계수를 출력하는데,
   그걸 200번 부르면 로그가 1000줄 늘어난다.
 
   정리 전에는 그 조용한 버전이 실험 폴더마다 한 벌씩 있었다:
@@ -22,7 +22,7 @@
      가 신호로 섞인다 (실험9 에서 실측으로 확인된 함정).
   2. **메타학습기는 train fold 로만 적합한다.** ``iter_fold_stack`` 이 train
      환자의 OOF 점수로 CoxPH 를 적합하고 test 에만 적용한다 —
-     ``fusion_stack.combine_risk_scores`` 와 정확히 같은 루프이며, 실제로 그
+     ``late_fusion.combine_risk_scores`` 와 정확히 같은 루프이며, 실제로 그
      함수가 이 생성기를 쓴다(정의가 두 곳에 있으면 언젠가 갈라진다).
 """
 import numpy as np
@@ -30,7 +30,7 @@ import pandas as pd
 from lifelines import CoxPHFitter
 from scipy import stats
 
-from sclc.metrics import cindex
+from sclc.evaluation import cindex
 
 
 # ---------------------------------------------------------------------------

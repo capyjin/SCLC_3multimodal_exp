@@ -28,7 +28,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 from sclc import plotstyle as ps  # noqa: E402
-from sclc.metrics import cindex  # noqa: E402
+from sclc.evaluation import cindex  # noqa: E402
 
 OUT_DIR = os.path.join(PROJECT_ROOT, "outputs", "image_permutation")
 TARGETS = ("os", "pfs")
@@ -78,7 +78,7 @@ def bootstrap_ci(oof: list[dict], n_boot: int = N_BOOT, seed: int = BOOT_SEED) -
     "이 모델들이 이 환자들에서 낸 값"의 구간이다. 학습 변동은 B팔이 따로 잰다.
 
     fold 마다 위험점수 척도가 다르므로 238명을 이어붙이지 않고 fold 안에서만
-    재표집한 뒤 fold 평균을 낸다(sclc.metrics.fold_mean_cindex 관례).
+    재표집한 뒤 fold 평균을 낸다(sclc.evaluation.fold_mean_cindex 관례).
     """
     by_fold: dict[int, list[dict]] = {}
     for row in oof:

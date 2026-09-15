@@ -35,7 +35,7 @@ import torch.optim as optim
 from lifelines.utils import concordance_index
 
 from sclc import cohort, features
-from sclc.fusion_stack import labels_by_id
+from sclc.late_fusion import labels_by_id
 from sclc.model import generate_net, get_cox_ph_model
 from sclc.train import ImageOnlyEvaluator, fold_plan, seed_everything
 

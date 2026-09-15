@@ -41,7 +41,7 @@ concat(128+128+16=272) → Dropout(0.3) → Linear(272,1,bias=False) → Cox 위
 Cox 음의 부분우도로 end-to-end 학습. `use_image`/`use_clinical`/`use_report` 플래그로
 브랜치를 켜고 끌 수 있다(절제 실험이 이걸 쓴다).
 
-### Late(출력 수준, 가중합) fusion — `sclc.fusion_stack`
+### Late(출력 수준, 가중합) fusion — `sclc.late_fusion`
 
 단일모달 모델을 각각 독립 학습해(같은 코호트/split/seed) fold별 OOF 위험점수를 모은
 뒤, fold 마다 `lifelines.CoxPHFitter` 를 적합한다 — 학습된 계수가 곧 "가중합"이다.

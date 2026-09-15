@@ -4,7 +4,7 @@
 ``cox_ph_loss``/``train_one_epoch``/``fit``/시드 헬퍼는
 ``clinical+image/train.py`` 에서 그대로 가져왔다(이미지는 PNG 를 그때그때
 읽어야 해서 pycox 로 대체할 수 없다). late fusion 의 clinical-only/report-only
-arm 은 반대로 pycox ``CoxPH`` + torchtuples 를 쓴다 (``sclc.fusion_arms``).
+arm 은 반대로 pycox ``CoxPH`` + torchtuples 를 쓴다 (``sclc.unimodal_arms``).
 
 공개 API: ``cox_ph_loss``, ``evaluate_c_index``, ``fit``, ``fold_plan``,
 ``seed_everything``, ``TrimodalEvaluator``, ``ImageOnlyEvaluator``.
@@ -44,7 +44,8 @@ def seed_everything(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def cox_ph_loss(risk_scores: torch.Tensor, durations: torch.Tensor, events: torch.Tensor) -> torch.Tensor:
+def cox_ph_loss(risk_scores: torch.Tensor, durations: torch.Tensor,
+                events: torch.Tensor) -> torch.Tensor:
     """Cox negative partial log-likelihood. Higher risk_scores = higher risk
     = shorter expected survival. See clinical+image/train.py for the full
     derivation comment -- logic is unchanged here."""
@@ -86,8 +87,8 @@ def evaluate_c_index(model: nn.Module, loader: DataLoader, device: torch.device)
     )
 
 
-def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optimizer, device: torch.device,
-                    grad_modulator=None, aux_loss_fn=None) -> float:
+def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optimizer,
+                    device: torch.device, grad_modulator=None, aux_loss_fn=None) -> float:
     """grad_modulator: loss.backward() 직후 optimizer.step() 직전에 호출되는 훅.
     시그니처 (model, images, tabular, durations, events) -> None 이며,
     브랜치별 gradient를 직접 조절하는 용도(OGM-GE 등). None이면 기존 동작과 완전히 동일.
@@ -114,7 +115,8 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optim
         events = events.to(device)
 
         optimizer.zero_grad()
-        risk_scores = model(images, tabular).squeeze(1) if tabular is not None else model(images).squeeze(1)
+        risk_scores = (model(images, tabular).squeeze(1) if tabular is not None
+                       else model(images).squeeze(1))
         loss = cox_ph_loss(risk_scores, durations, events)
         if aux_loss_fn is not None:
             loss = loss + aux_loss_fn(model, images, tabular, durations, events)
@@ -126,22 +128,27 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optim
         batch_size = images.size(0)
         total_loss += loss.item() * batch_size
         total_count += batch_size
-        pbar.set_postfix({"batch_loss": f"{loss.item():.4f}", "avg_loss": f"{total_loss / total_count:.4f}"})
+        pbar.set_postfix({"batch_loss": f"{loss.item():.4f}",
+                          "avg_loss": f"{total_loss / total_count:.4f}"})
 
     return total_loss / total_count
 
 
-def fit(model, train_loader, val_loader, optimizer, device, epochs, save_path, grad_modulator=None, aux_loss_fn=None):
+def fit(model, train_loader, val_loader, optimizer, device, epochs, save_path,
+       grad_modulator=None, aux_loss_fn=None):
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     best_val_cindex = -np.inf
     history: list[dict] = []
 
     for epoch in tqdm(range(1, epochs + 1), desc="Epochs"):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, grad_modulator, aux_loss_fn)
+        train_loss = train_one_epoch(model, train_loader, optimizer, device,
+                                     grad_modulator, aux_loss_fn)
         train_cindex = evaluate_c_index(model, train_loader, device)
         val_cindex = evaluate_c_index(model, val_loader, device)
-        print(f"[Epoch {epoch:03d}] train_loss={train_loss:.4f} train_cindex={train_cindex:.4f} val_cindex={val_cindex:.4f}")
-        history.append({"epoch": int(epoch), "train_loss": float(train_loss), "train_cindex": float(train_cindex), "val_cindex": float(val_cindex)})
+        print(f"[Epoch {epoch:03d}] train_loss={train_loss:.4f} "
+              f"train_cindex={train_cindex:.4f} val_cindex={val_cindex:.4f}")
+        history.append({"epoch": int(epoch), "train_loss": float(train_loss),
+                        "train_cindex": float(train_cindex), "val_cindex": float(val_cindex)})
 
         if val_cindex > best_val_cindex:
             best_val_cindex = val_cindex
@@ -159,7 +166,8 @@ def fold_plan(cohort_df: pd.DataFrame, max_folds: int | None = None):
     plan = []
     for fold in folds:
         fold_df = cohort_df[cohort_df["fold"] == fold]
-        ids = {name: fold_df.loc[fold_df["split"] == name, "research_id"].astype(int).tolist() for name in ("train", "val", "test")}
+        ids = {name: fold_df.loc[fold_df["split"] == name, "research_id"].astype(int).tolist()
+              for name in ("train", "val", "test")}
         plan.append((fold, ids))
     return plan
 
@@ -257,25 +265,34 @@ class TrimodalEvaluator:
         standardize_cols, categorical_cols = resolve_columns(clinical_frame)
         corpus, _ = features.load_text_corpus(self.merged_csv, source=self.text_source)
 
-        self.c_indices, self.fold_records, self.oof_predictions, self.training_history = [], [], [], []
+        self.c_indices, self.fold_records = [], []
+        self.oof_predictions, self.training_history = [], []
 
         plan = fold_plan(cohort_df, max_folds=self.max_folds)
         for plan_index, (fold, ids) in enumerate(plan):
             print(f"\n=== [early_fusion/{self.target}] Fold {fold} ===")
             seed_everything(self.seed + fold)
 
-            train_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["train"]].reset_index(), self.target, self.gray_scale)
-            val_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["val"]].reset_index(), self.target, self.gray_scale)
-            test_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["test"]].reset_index(), self.target, self.gray_scale)
-            print(f"  Train: {len(train_samples)}, Val: {len(val_samples)}, Test: {len(test_samples)}")
+            train_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["train"]].reset_index(),
+                self.target, self.gray_scale)
+            val_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["val"]].reset_index(),
+                self.target, self.gray_scale)
+            test_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["test"]].reset_index(),
+                self.target, self.gray_scale)
+            print(f"  Train: {len(train_samples)}, Val: {len(val_samples)}, "
+                 f"Test: {len(test_samples)}")
             if not test_samples:
                 print(f"  [skip] fold {fold}: no test samples found")
                 continue
 
             tabular, clinical_dim, report_dim = features.build_fold_multimodal_tabular(
-                clinical_frame.loc[ids["train"]], clinical_frame.loc[ids["val"]], clinical_frame.loc[ids["test"]],
-                corpus, standardize_cols, categorical_cols,
-                tfidf_max_features=self.tfidf_max_features, tfidf_ngram_range=self.tfidf_ngram_range,
+                clinical_frame.loc[ids["train"]], clinical_frame.loc[ids["val"]],
+                clinical_frame.loc[ids["test"]], corpus, standardize_cols, categorical_cols,
+                tfidf_max_features=self.tfidf_max_features,
+                tfidf_ngram_range=self.tfidf_ngram_range,
                 extra_numeric_fn=self.extra_numeric_fn, text_encoder_fn=self.text_encoder_fn,
             )
 
@@ -288,12 +305,16 @@ class TrimodalEvaluator:
                 train_tabular=tabular["train"], test_tabular=tabular["test"],
             )
 
-            loader_kwargs = {"num_workers": self.num_workers, "pin_memory": True, "worker_init_fn": _seed_worker}
+            loader_kwargs = {"num_workers": self.num_workers, "pin_memory": True,
+                             "worker_init_fn": _seed_worker}
             generator = torch.Generator()
             generator.manual_seed(self.seed + fold)
-            train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True, generator=generator, **loader_kwargs)
-            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
-            test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
+            train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True,
+                                     generator=generator, **loader_kwargs)
+            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
+                                   **loader_kwargs)
+            test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False,
+                                    **loader_kwargs)
 
             if self.model_factory is not None:
                 model = self.model_factory(clinical_dim, report_dim).to(self.device)
@@ -310,19 +331,23 @@ class TrimodalEvaluator:
             if plan_index == 0:
                 sample_batch = next(iter(train_loader))
                 s_img, s_tab, _, _ = sample_batch
-                print(f"[Fusion] image batch shape: {s_img.shape}, tabular batch shape: {s_tab.shape}")
+                print(f"[Fusion] image batch shape: {s_img.shape}, "
+                     f"tabular batch shape: {s_tab.shape}")
                 model.eval()
                 with torch.no_grad():
                     s_out = model(s_img.to(self.device), s_tab.to(self.device))
                 print(f"[Fusion] model output shape: {s_out.shape}")
                 model.train()
 
-            aux_loss_fn = self.aux_loss_factory(fold, ids) if self.aux_loss_factory is not None else None
+            aux_loss_fn = (self.aux_loss_factory(fold, ids)
+                          if self.aux_loss_factory is not None else None)
 
             save_path = os.path.join(self.save_dir, f"fold{fold}_early_fusion_{self.target}.pt")
-            fold_history = fit(model, train_loader, val_loader, optimizer, self.device, self.epochs, save_path,
+            fold_history = fit(model, train_loader, val_loader, optimizer, self.device,
+                               self.epochs, save_path,
                                grad_modulator=self.grad_modulator, aux_loss_fn=aux_loss_fn)
-            self.training_history.extend([{"target": self.target, "fold": fold, **row} for row in fold_history])
+            self.training_history.extend(
+                [{"target": self.target, "fold": fold, **row} for row in fold_history])
 
             model.load_state_dict(torch.load(save_path, map_location=self.device))
             model.eval()
@@ -330,7 +355,8 @@ class TrimodalEvaluator:
             risks, durations, events = [], [], []
             with torch.no_grad():
                 for images, tabular_batch, dur, evt in test_loader:
-                    risk = model(images.to(self.device), tabular_batch.to(self.device)).squeeze(1).cpu().numpy()
+                    risk = model(images.to(self.device),
+                                tabular_batch.to(self.device)).squeeze(1).cpu().numpy()
                     risks.extend(risk.tolist())
                     durations.extend(dur.numpy().tolist())
                     events.extend(evt.numpy().tolist())
@@ -341,12 +367,15 @@ class TrimodalEvaluator:
             ci = concordance_index(durations, -risks, events)
             self.c_indices.append(ci)
             self.fold_records.append({
-                "target": self.target, "modality": "early_fusion_image_clinical_report", "fold": fold,
-                "c_index": round(float(ci), 4),
-                "n": len(risks), "event_count": int((events == 1).sum()), "censored_count": int((events == 0).sum()),
+                "target": self.target, "fold": fold,
+                "modality": "early_fusion_image_clinical_report",
+                "c_index": round(float(ci), 4), "n": len(risks),
+                "event_count": int((events == 1).sum()),
+                "censored_count": int((events == 0).sum()),
             })
             self.oof_predictions.extend([
-                {"research_id": rid, "target": self.target, "modality": "early_fusion_image_clinical_report",
+                {"research_id": rid, "target": self.target,
+                 "modality": "early_fusion_image_clinical_report",
                  "fold": fold, "duration": float(d), "event": float(e), "risk_score": float(r)}
                 for rid, d, e, r in zip(ids["test"], durations, events, risks)
             ])
@@ -358,7 +387,8 @@ class TrimodalEvaluator:
         best_src = os.path.join(self.save_dir, f"fold{best_fold}_early_fusion_{self.target}.pt")
         best_dst = os.path.join(self.save_dir, f"best_early_fusion_{self.target}.pt")
         shutil.copy2(best_src, best_dst)
-        print(f"\nCompleted {len(self.c_indices)} fold(s) C-index: {np.mean(self.c_indices):.4f} +/- {np.std(self.c_indices):.4f}")
+        print(f"\nCompleted {len(self.c_indices)} fold(s) C-index: "
+             f"{np.mean(self.c_indices):.4f} +/- {np.std(self.c_indices):.4f}")
         return self
 
 
@@ -417,28 +447,41 @@ class ImageOnlyEvaluator:
             cohort_df = self.cohort_transform(cohort_df)
         clinical_frame = cohort_df.drop_duplicates("research_id").set_index("research_id")
 
-        self.c_indices, self.fold_records, self.oof_predictions, self.training_history = [], [], [], []
+        self.c_indices, self.fold_records = [], []
+        self.oof_predictions, self.training_history = [], []
 
         for fold, ids in fold_plan(cohort_df, max_folds=self.max_folds):
             print(f"\n=== [late_fusion/image_only/{self.target}] Fold {fold} ===")
             seed_everything(self.seed + fold)
 
-            train_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["train"]].reset_index(), self.target, self.gray_scale)
-            val_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["val"]].reset_index(), self.target, self.gray_scale)
-            test_samples = ds.preprocess_data(self.image_dir, clinical_frame.loc[ids["test"]].reset_index(), self.target, self.gray_scale)
+            train_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["train"]].reset_index(),
+                self.target, self.gray_scale)
+            val_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["val"]].reset_index(),
+                self.target, self.gray_scale)
+            test_samples = ds.preprocess_data(
+                self.image_dir, clinical_frame.loc[ids["test"]].reset_index(),
+                self.target, self.gray_scale)
             if not test_samples:
                 print(f"  [skip] fold {fold}: no test samples found")
                 continue
 
-            train_ds, val_ds = ds.create_dataset(train_samples, val_samples, self.resize, self.augment, self.gray_scale, False)
-            _, test_ds = ds.create_dataset(train_samples, test_samples, self.resize, False, self.gray_scale, False)
+            train_ds, val_ds = ds.create_dataset(
+                train_samples, val_samples, self.resize, self.augment, self.gray_scale, False)
+            _, test_ds = ds.create_dataset(
+                train_samples, test_samples, self.resize, False, self.gray_scale, False)
 
-            loader_kwargs = {"num_workers": self.num_workers, "pin_memory": True, "worker_init_fn": _seed_worker}
+            loader_kwargs = {"num_workers": self.num_workers, "pin_memory": True,
+                             "worker_init_fn": _seed_worker}
             generator = torch.Generator()
             generator.manual_seed(self.seed + fold)
-            train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True, generator=generator, **loader_kwargs)
-            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
-            test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False, **loader_kwargs)
+            train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True,
+                                     generator=generator, **loader_kwargs)
+            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
+                                   **loader_kwargs)
+            test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False,
+                                    **loader_kwargs)
 
             if self.model_factory is not None:
                 model = self.model_factory().to(self.device)
@@ -447,11 +490,14 @@ class ImageOnlyEvaluator:
             if self.optimizer_factory is not None:
                 optimizer = self.optimizer_factory(model)
             else:
-                optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+                optimizer = optim.Adam(model.parameters(), lr=self.lr,
+                                       weight_decay=self.weight_decay)
 
             save_path = os.path.join(self.save_dir, f"fold{fold}_{self.ckpt_tag}_{self.target}.pt")
-            fold_history = fit(model, train_loader, val_loader, optimizer, self.device, self.epochs, save_path)
-            self.training_history.extend([{"target": self.target, "fold": fold, **row} for row in fold_history])
+            fold_history = fit(model, train_loader, val_loader, optimizer, self.device,
+                               self.epochs, save_path)
+            self.training_history.extend(
+                [{"target": self.target, "fold": fold, **row} for row in fold_history])
 
             model.load_state_dict(torch.load(save_path, map_location=self.device))
             model.eval()
@@ -477,7 +523,8 @@ class ImageOnlyEvaluator:
             self.fold_records.append({
                 "target": self.target, "modality": "image_only", "fold": fold,
                 "c_index": round(float(ci), 4),
-                "n": len(risks), "event_count": int((events == 1).sum()), "censored_count": int((events == 0).sum()),
+                "n": len(risks), "event_count": int((events == 1).sum()),
+                "censored_count": int((events == 0).sum()),
             })
             self.oof_predictions.extend([
                 {"research_id": rid, "target": self.target, "modality": "image_only",
@@ -488,5 +535,6 @@ class ImageOnlyEvaluator:
 
         if not self.c_indices:
             raise RuntimeError("No folds were completed.")
-        print(f"\nCompleted {len(self.c_indices)} fold(s) C-index: {np.mean(self.c_indices):.4f} +/- {np.std(self.c_indices):.4f}")
+        print(f"\nCompleted {len(self.c_indices)} fold(s) C-index: "
+             f"{np.mean(self.c_indices):.4f} +/- {np.std(self.c_indices):.4f}")
         return self

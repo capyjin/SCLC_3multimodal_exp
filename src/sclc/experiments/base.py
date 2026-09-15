@@ -38,7 +38,7 @@ import argparse
 import numpy as np
 
 from sclc import paths
-from sclc.metrics import train_val_gap
+from sclc.evaluation import train_val_gap
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.utils import cli
 from sclc.utils.logging import banner, get_logger, section
@@ -153,7 +153,7 @@ class BaseExperiment(ABC):
         cis = ev.c_indices
         gaps = train_val_gap(ev.training_history)
         if getattr(ev, "oof_predictions", None):
-            from sclc.fusion_stack import oof_dict
+            from sclc.late_fusion import oof_dict
             self.oof[name] = oof_dict(ev.oof_predictions)
         return {
             "name": name,

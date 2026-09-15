@@ -21,7 +21,7 @@
 누수 방지:
   - 각 단독 모델의 OOF 위험점수는 그 환자가 test 였던 fold 의 모델이 낸 값이다.
   - CoxPH 결합은 fold 마다 train 환자의 OOF 점수로만 fit 하고 test 에 적용한다
-    (``sclc.fusion_stack.combine_two`` — 검증된 코드를 그대로 재사용).
+    (``sclc.late_fusion.combine_two`` — 검증된 코드를 그대로 재사용).
   - ⚠️ nested CV 가 아니라는 알려진 한계는 sclc/experiments/fusion.py 참고.
 
 Run:  python experiments/실험6_판독지_인코더_비교/exp_encoder_fusion.py --target os

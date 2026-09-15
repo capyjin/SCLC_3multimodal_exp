@@ -96,7 +96,7 @@ def load_tabular_oof(target: str, ckpt_dir: str = TABULAR_CKPT_DIR,
     그 모델 자신의 결합 risk 를 train/test 각각에 대해 forward 로 뽑는다.
 
     ``text_encoder_fn`` (기본 None=TF-IDF, 기존 동작과 완전히 동일)은 판독지 블록을
-    다른 인코더(RadBERT 등)로 대체한다 -- ``sclc.fusion_stack.get_tabular_oof``가
+    다른 인코더(RadBERT 등)로 대체한다 -- ``sclc.late_fusion.get_tabular_oof``가
     체크포인트를 **학습할 때** 쓴 것과 반드시 같아야 한다(다르면 report_branch 입력
     분포가 학습 때와 달라져 forward 결과가 무의미해진다). ``ckpt_dir``도 그 학습이
     저장한 경로와 맞춰야 한다(예: RadBERT 체크포인트는

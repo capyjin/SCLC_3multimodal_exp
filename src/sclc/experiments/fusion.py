@@ -5,7 +5,7 @@
   1. **축(axis)** 을 하나씩 5-fold 로 학습해 OOF 위험점수를 얻는다
      (축 = 임상 단독 / 판독지 단독 / 영상 단독 / concat[임상+판독지] ...).
   2. 축 두 개를 골라 fold 마다 **train 환자의 OOF 점수로만** CoxPH 를 적합하고
-     test 에 적용해 결합 성능을 잰다 (``fusion_stack.combine_two``).
+     test 에 적용해 결합 성능을 잰다 (``late_fusion.combine_two``).
 
   1번은 ``BaseExperiment`` 의 항목 루프가 그대로 처리한다 — 축이 곧 항목이다.
   이 클래스가 더하는 건 2번(결합 단계)과 축별로 다른 평가기를 쓰는 길뿐이다.
@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from sclc import cohort
 from sclc.encoders.base import ReportEncoder
 from sclc.experiments.base import BaseExperiment, ReportCorpusMixin
-from sclc.fusion_stack import combine_two
+from sclc.late_fusion import combine_two
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.utils.logging import banner, section
 from sclc.utils.summary import Table

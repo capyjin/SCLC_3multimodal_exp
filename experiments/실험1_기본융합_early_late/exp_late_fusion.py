@@ -20,7 +20,7 @@
 [누수 방지]
   각 환자의 위험점수는 그 환자가 test 였던 fold 의 모델이 낸 OOF 값이고,
   CoxPH 결합기는 fold 마다 train 환자의 OOF 로만 적합한다
-  (``sclc.fusion_stack.combine_two`` — 검증된 코드를 그대로 쓴다).
+  (``sclc.late_fusion.combine_two`` — 검증된 코드를 그대로 쓴다).
   ⚠️ nested CV 가 아니라는 알려진 한계는 ``sclc/experiments/fusion.py`` 참고.
 
 [출력이 print 인 이유]
@@ -47,7 +47,7 @@ import time
 
 from sclc import cohort, paths
 from sclc.encoders import build_encoder
-from sclc.fusion_stack import (ArmResult, combine_two, combine_weighted_sum,
+from sclc.late_fusion import (ArmResult, combine_two, combine_weighted_sum,
                                get_image_oof_resnet18, get_image_oof_simplecnn,
                                get_tabular_oof, load_oof_cache, oof_dict)
 from sclc.utils.cli import comma_list
@@ -263,13 +263,13 @@ KNOWN_LEGACY_3WAY = {"os": 0.6703, "pfs": 0.6288}
 def cmd_three_way(args) -> None:
     """임상·판독지·영상을 각각 독립 학습한 뒤 CoxPH 로 가중합한다.
 
-    임상/판독지 축은 ``sclc.fusion_arms`` 의 **pycox 경로**를 개선된 학습조건
+    임상/판독지 축은 ``sclc.unimodal_arms`` 의 **pycox 경로**를 개선된 학습조건
     (bs32/ep60)으로 새로 학습한다. 영상 축은 **재학습하지 않고**
     ``outputs/late_fusion_B/oof_<target>.json`` 의 값을 재사용한다 — 영상 arm 의
     표준 조건(bs16/ep30)에서 이미 학습된 것이고, 임상 컬럼을 읽지 않으므로
     이 실험의 변경이 영상 축에 영향을 줄 수 없다.
     """
-    from sclc import fusion_arms       # pycox/torchtuples 로딩이 느려서 여기서
+    from sclc import unimodal_arms       # pycox/torchtuples 로딩이 느려서 여기서
 
     out_dir = args.out_dir or paths.outputs("late_fusion_3modal_rerun")
     os.makedirs(out_dir, exist_ok=True)
@@ -277,10 +277,10 @@ def cmd_three_way(args) -> None:
     target = args.target
 
     print(f"\n########## clinical_only  target={target}  bs={args.batch_size} ep={args.epochs} ##########")
-    clin = fusion_arms.run_clinical_only(cohort_df, target, batch_size=args.batch_size,
+    clin = unimodal_arms.run_clinical_only(cohort_df, target, batch_size=args.batch_size,
                                          epochs=args.epochs, seed=args.seed)
     print(f"\n########## report_only  target={target}  bs={args.batch_size} ep={args.epochs} ##########")
-    rep = fusion_arms.run_report_only(cohort_df, target, batch_size=args.batch_size,
+    rep = unimodal_arms.run_report_only(cohort_df, target, batch_size=args.batch_size,
                                       epochs=args.epochs, seed=args.seed)
 
     def _folds(res):

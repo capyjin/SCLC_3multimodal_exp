@@ -1,24 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Late fusion 인프라 — 단일모달 OOF 위험점수 추출 + CoxPH 가중합 결합.
+"""Late fusion — 축별로 따로 학습한 OOF 위험점수를 fold별 CoxPH 로 결합한다.
 
-[왜 src/sclc 에 있나]
-  이 코드는 원래 실험 스크립트(``late_fusion_tab_image.py``,
-  ``late_fusion_3modal.py``) 안에 있었는데, 실험 4개(RadBERT 융합, RadBERT
-  전체, stage-aware, 임상 결측 후속)가 그 실험 파일을 서로 import 하고 있었다.
-  두 실험 이상이 쓰는 코드는 실험이 아니라 인프라이므로 여기로 옮겼다.
-
-[중복 통합 — combine_risk_scores]
-  예전에는 결합 함수가 두 벌이었다.
-    late_fusion_tab_image.combine_two      : 2변수(tabular, image)
-    late_fusion_3modal.combine_weighted_sum: 3변수(image, clinical, report)
-  fold 별 CoxPH 적합 -> test 예측 -> C-index 라는 절차가 완전히 같고 변수
-  개수와 반환 키만 달랐다. ``combine_risk_scores`` 하나로 합치고, 기존
-  호출부가 쓰던 반환 키(``mean_coef['risk_tabular']`` 등)는 얇은 래퍼
-  ``combine_two``/``combine_weighted_sum`` 가 그대로 유지한다.
-
-[누수 방지]  결합기는 fold 마다 **train 환자의 OOF 점수로만** 적합하고 test
-  환자에 적용한다. 각 환자의 OOF 점수는 그 환자가 test 였던 fold 의 모델이
-  낸 값이다(Evaluator 가 fold 별 test 예측만 모아 준다).
+결합기는 fold 마다 train 환자의 OOF 점수로만 적합하고 test 환자에 적용한다(누수 방지).
 """
 import json
 import os
@@ -28,8 +11,8 @@ import numpy as np
 import pandas as pd
 import torch.optim as optim
 from sclc import paths
-from sclc.fusion_diag import iter_fold_stack
-from sclc.metrics import cindex
+from sclc.late_fusion_tests import iter_fold_stack
+from sclc.evaluation import cindex
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.train import ImageOnlyEvaluator, TrimodalEvaluator, fold_plan
 
@@ -56,29 +39,13 @@ def cindex_stats(c_indices) -> tuple[float, float]:
 
 
 def _bf_suffix(fix_brain_meta: bool) -> str:
-    """체크포인트 폴더 꼬리표. brain_meta 수정 유무로 저장 위치를 나눠서,
-    수정본 재실행이 기존(legacy) 산출물을 덮어쓰지 않게 한다."""
+    """체크포인트 폴더 꼬리표 — brain_meta 수정본이 기존 산출물을 덮어쓰지 않게 분리."""
     return "" if fix_brain_meta else "_legacy"
 
 
 @dataclass
 class ArmResult:
-    """축(arm) 하나의 실행 결과 — OOF 위험점수 + fold별 C-index.
-
-    [왜 필요한가]
-      ``late_fusion_tab_image`` 와 ``late_fusion_seed_sweep`` 가 축마다 똑같은
-      네 줄을 반복하고 있었다::
-
-          risk = oof_dict(ev.oof_predictions)
-          mean, std = cindex_stats(ev.c_indices)
-          folds = [round(float(c), 4) for c in ev.c_indices]
-          print(f"[lateB] ... {mean:.4f} +/- {std:.4f} folds={folds}")
-
-      두 파일의 소수점 자리수(4 vs 6)만 달랐고 나머지는 같았다. 결과 JSON 의
-      arm 블록 모양(``{"mean","std","folds"}``)이 여기서 한 번만 정의되므로,
-      ``outputs/late_fusion_B/results.json`` 을 읽는 ``tools/plot_all_figures.py``
-      와의 계약이 한 곳에 고정된다.
-    """
+    """축 하나의 실행 결과 — OOF 위험점수 + fold별 C-index."""
     tag: str
     risk: dict = field(repr=False)          # {research_id: OOF 위험점수}
     c_indices: list = field(repr=False)     # fold별 C-index
@@ -101,28 +68,20 @@ class ArmResult:
         return [round(float(c), ndigits) for c in self.c_indices]
 
     def as_dict(self, ndigits: int = 4) -> dict:
-        """결과 JSON 에 넣는 arm 블록 (기존 스키마와 동일)."""
+        """결과 JSON 에 넣는 arm 블록 {"mean","std","folds"}."""
         return {"mean": self.mean, "std": self.std, "folds": self.folds(ndigits)}
 
 
 # ---------------------------------------------------------------------------
 # OOF 위험점수 캐시 (outputs/<dir>/oof_<target>.json)
 # ---------------------------------------------------------------------------
-# 정리 전에는 이 파일을 읽는 코드가 네 벌이었다 — 실험1의 3modal 재실행,
-# 실험5의 분석 두 개, 실험7의 결합 후속. 넷 다 "JSON 을 열고 문자열 키를 int
-# 로 바꾼다"는 같은 두 줄이었는데, 그중 하나만 float() 캐스팅을 빠뜨려도
-# 아무 에러 없이 다른 타입이 흘러들어간다. 그래서 여기 한 곳으로 모은다.
 def oof_cache_path(target: str, out_dir: str = DEFAULT_OUT_DIR) -> str:
     return os.path.join(out_dir, f"oof_{target}.json")
 
 
 def load_oof_cache(target: str, out_dir: str = DEFAULT_OUT_DIR,
                    keys=("tabular", "image")) -> dict[str, dict]:
-    """``oof_<target>.json`` -> ``{축이름: {research_id(int): 위험점수(float)}}``.
-
-    파일이 없으면 ``FileNotFoundError`` 를 그대로 올린다 — 조용히 빈 dict 를
-    돌려주면 "재학습 없이 캐시로 분석한다"는 전제가 깨진 채로 통계가 나온다.
-    """
+    """``oof_<target>.json`` -> ``{축이름: {research_id(int): 위험점수(float)}}``."""
     with open(oof_cache_path(target, out_dir), encoding="utf-8") as fh:
         payload = json.load(fh)
     return {k: {int(i): float(v) for i, v in payload[k].items()} for k in keys}
@@ -144,8 +103,7 @@ def get_tabular_oof(target: str, batch_size: int = 32, epochs: int = 60,
                     max_folds=None, seed: int = 42, fix_brain_meta: bool = True,
                     out_dir: str = DEFAULT_OUT_DIR, text_encoder_fn=None,
                     model_config: str = "clin_report"):
-    """(1) 임상+판독지 결합 모델 (영상 제외, bs32/ep60).
-    OS 0.708 을 냈던 가장 강한 tabular 축이다. Evaluator 를 그대로 돌려준다."""
+    """tabular 축 — 임상+판독지 결합 모델 (영상 제외, bs32/ep60)."""
     return TrimodalEvaluator(
         target=target, epochs=epochs, batch_size=batch_size,
         save_dir=os.path.join(out_dir, f"tabular_{target}{_bf_suffix(fix_brain_meta)}"),
@@ -157,7 +115,7 @@ def get_tabular_oof(target: str, batch_size: int = 32, epochs: int = 60,
 
 def get_image_oof_simplecnn(target: str, batch_size: int = 16, epochs: int = 30,
                             max_folds=None, seed: int = 42, out_dir: str = DEFAULT_OUT_DIR):
-    """(2) 영상 단독 — SimpleCNN (bs16/ep30, 영상 arm 의 표준 조건)."""
+    """영상 축 — SimpleCNN (bs16/ep30, 채택 백본)."""
     return ImageOnlyEvaluator(
         target=target, epochs=epochs, batch_size=batch_size, resize=512,
         save_dir=os.path.join(out_dir, f"image_simplecnn_{target}"),
@@ -170,8 +128,7 @@ def get_image_oof_resnet18(target: str, batch_size: int = 16, epochs: int = 30,
                            head_lr: float = 1e-3, weight_decay: float = 1e-4,
                            dropout: float = 0.3, max_folds=None, seed: int = 42,
                            out_dir: str = DEFAULT_OUT_DIR):
-    """(3) 영상 단독 — ImageNet 사전학습 ResNet18.
-    과적합 방지: 백본은 낮은 학습률, 출력 head 는 높은 학습률."""
+    """영상 축 대조군 — ImageNet 사전학습 ResNet18 (백본 저LR + head 고LR)."""
     from sclc.model import ResNet18DeepSurv
 
     def model_factory():
@@ -198,10 +155,7 @@ def get_image_oof_radimagenet(target: str, batch_size: int = 16, epochs: int = 3
                               dropout: float = 0.3, pretrained: bool = True,
                               max_folds=None, seed: int = 42,
                               out_dir: str = DEFAULT_OUT_DIR):
-    """(4) 영상 단독 — RadImageNet(CT/MRI/초음파 130만 장) 사전학습 ResNet50.
-    ResNet18(자연영상)과 대비되는 조건: 방사선영상 통계로는 사전학습됐지만
-    PET 자체는 학습 데이터에 없음. ``pretrained=False`` 로 실험8/10 식 랜덤
-    초기화 대조군도 만들 수 있다(같은 구조, 학습 안 함)."""
+    """영상 축 대조군 — RadImageNet 사전학습 ResNet50. ``pretrained=False`` 면 랜덤 초기화 대조군."""
     from sclc.model import RadImageNetDeepSurv
 
     def model_factory():
@@ -229,27 +183,15 @@ def get_image_oof_radimagenet(target: str, batch_size: int = 16, epochs: int = 3
 def combine_risk_scores(cohort_df: pd.DataFrame, target: str, risks: dict[str, dict],
                         max_folds: int | None = None, modality: str = "late_fusion",
                         log_prefix: str = "late/combine") -> dict:
-    """N개의 OOF 위험점수를 fold별 CoxPH 로 결합한다.
+    """N개의 OOF 위험점수를 fold별 CoxPH 로 결합한다 (적합 계수 = 가중합의 가중치).
 
-    ``risks`` 는 ``{공변량이름: {research_id: 위험점수}}``. 공변량 이름이 곧
-    CoxPH 설계행렬의 컬럼명이자 반환되는 계수 딕셔너리의 키다.
-
-    fold 마다: train 환자의 위험점수로 CoxPH 적합 -> test 환자에 적용 ->
-    C-index. 학습된 계수가 곧 "가중합"의 가중치다.
-
-    Returns (2·3변수 호출부가 쓰던 키를 모두 포함하는 상위집합)::
-
-        {"fold_cindex": [...], "mean": .., "std": ..,
-         "coefs_per_fold": [{name: coef}, ...], "mean_coef": {name: coef},
-         "fold_records": [...], "oof_predictions": [...]}
+    ``risks`` 는 ``{공변량이름: {research_id: 위험점수}}``. 반환:
+    ``fold_cindex · mean · std · coefs_per_fold · mean_coef · fold_records · oof_predictions``.
     """
     names = list(risks)
     labels = labels_by_id(cohort_df, target)
     plan = fold_plan(cohort_df, max_folds=max_folds)
 
-    # fold 루프 자체(train 으로만 적합 -> test 에 적용)는 ``fusion_diag.iter_fold_stack``
-    # 한 곳에만 있다. 진단 쪽(순열검정·계수검정)이 같은 절차를 다시 구현하면
-    # "결합기와 검정이 같은 절차인가"를 매번 눈으로 확인해야 한다.
     fold_cindex, coefs_per_fold, fold_records, oof = [], [], [], []
     for fold, ids, cph, test_df, _cols in iter_fold_stack(risks, labels, plan, target, names):
         test_risk = cph.predict_partial_hazard(test_df[names]).to_numpy()
@@ -278,8 +220,7 @@ def combine_risk_scores(cohort_df: pd.DataFrame, target: str, risks: dict[str, d
 
 
 def combine_two(cohort_df, target, tabular_risk, image_risk, max_folds=None) -> dict:
-    """2축 결합 (tabular = 임상+판독지 합동 모델, image = 영상 단독).
-    프로젝트의 채택 모델(late fusion method B)이 쓰는 조합이다."""
+    """2축 결합 (tabular + image) — 프로젝트 채택 모델."""
     return combine_risk_scores(
         cohort_df, target, {"risk_tabular": tabular_risk, "risk_image": image_risk},
         max_folds=max_folds, modality="late_fusion_tab_image", log_prefix="lateB/combine",

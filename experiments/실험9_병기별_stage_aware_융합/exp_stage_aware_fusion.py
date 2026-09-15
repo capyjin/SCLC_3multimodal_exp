@@ -59,7 +59,7 @@ from lifelines import CoxPHFitter
 from lifelines.utils import concordance_index
 
 from sclc import cohort
-from sclc.metrics import concordant_pair_counts as _pair_counts
+from sclc.evaluation import concordant_pair_counts as _pair_counts
 from sclc.train import fold_plan
 
 OUT_DIR = os.path.join(PROJECT_ROOT, "outputs", "stage_aware_fusion")
@@ -115,7 +115,7 @@ def get_oof_scores(target: str, *, tab_epochs=60, tab_batch=32, seed=42,
                 "image": {int(k): v for k, v in d["image"].items()},
                 "provenance": d["provenance"]}
 
-    from sclc.fusion_stack import get_tabular_oof, oof_dict
+    from sclc.late_fusion import get_tabular_oof, oof_dict
 
     print(f"\n########## C+R(tabular) 재학습  target={target} "
           f"bs={tab_batch} ep={tab_epochs} fix_brain_meta={fix_brain_meta} ##########")
@@ -129,7 +129,7 @@ def get_oof_scores(target: str, *, tab_epochs=60, tab_batch=32, seed=42,
         img_src = src
         print(f"[oof] image 재사용 (재학습 없음): {os.path.basename(src)}  n={len(img)}")
     else:
-        from sclc.fusion_stack import get_image_oof_simplecnn
+        from sclc.late_fusion import get_image_oof_simplecnn
         iev = get_image_oof_simplecnn(target, epochs=30)
         img = oof_dict(iev.oof_predictions)
         img_src = "retrained"

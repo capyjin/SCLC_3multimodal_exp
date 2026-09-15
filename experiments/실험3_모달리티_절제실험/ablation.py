@@ -42,7 +42,7 @@ import json
 
 import numpy as np
 
-from sclc.metrics import train_val_gap
+from sclc.evaluation import train_val_gap
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.train import TrimodalEvaluator
 

@@ -170,7 +170,7 @@ PFS는 TF-IDF**(concat 조합에서 PFS는 RadBERT가 오히려 나쁘다: 0.669
 ⚠️ **기준선 읽는 법 (2) — 그래도 그 수치와 정확히 같지 않다.** 그림의 기준선(OS 0.7299 /
 PFS 0.6715)은 위 공식 late fusion(OS 0.7224 / PFS 0.6621)과도 **다른 방식으로 계산된
 값**이다 — 결합 비율(계수)을 학습할 때 tabular 축의 "train" 점수로 무엇을 쓰는지가
-다르다. 공식 파이프라인(`src/sclc/fusion_stack.py::combine_risk_scores`)은 train 환자에도
+다르다. 공식 파이프라인(`src/sclc/late_fusion.py::combine_risk_scores`)은 train 환자에도
 항상 **다른 fold 모델이 매긴 진짜 OOF 점수**를 쓰는 반면, 이 실험의 재현 코드
 (`coxph_reproduction`)는 **그 fold 모델이 자기 학습 데이터를 스스로 채점한 값**
 (in-sample)을 쓴다 — 코드에 내장된 진단(`g4_in_sample_vs_oof`)으로 실측하면 이

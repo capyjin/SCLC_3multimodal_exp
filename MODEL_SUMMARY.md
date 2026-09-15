@@ -55,7 +55,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **성능 OS** | **0.6570 ± 0.048** | 0.6418~0.6557 (변형별, 전부 DeepSurv 이하) |
 | **성능 PFS** | **0.6154 ± 0.057** | 0.5901~0.6315 |
 | **모델 구조** | 4× ConvBlock(Conv3×3–BN–ReLU–MaxPool2, 1→32→64→128→256) → AdaptiveAvgPool → Linear(256,512) → Dropout → Linear(512,1), Cox 부분우도로 end-to-end 학습 | 같은 백본으로 특징만 뽑고 PCA/능형회귀 등으로 축소 후 lifelines CoxPH로 위험점수 산출(12가지 변형 다 시도) |
-| **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; 영상 축은 `sclc.fusion_stack.get_image_oof_simplecnn`) | `experiments/실험8_영상단독_고전CoxPH/exp_image_cph.py` |
+| **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; 영상 축은 `sclc.late_fusion.get_image_oof_simplecnn`) | `experiments/실험8_영상단독_고전CoxPH/exp_image_cph.py` |
 | **비고** | — | 2026-08-03에 "고전 CoxPH로 바꾸면 나아지나?"를 검증했으나 **전부 DeepSurv보다 낮거나 같음**. 오히려 학습 안 한 랜덤 CNN과 성능이 구분 안 됨(§ `experiments/실험8_영상단독_고전CoxPH/RESULTS_image_cph.md`) — 이 브랜치가 실제로 종양 특징을 배운 건지에 대한 의문이 남아있음 |
 
 ---
@@ -113,7 +113,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **성능 OS** | **0.7143 ± 0.051** | 0.7224 ± 0.033 |
 | **성능 PFS** | **0.6621 ± 0.040** | 0.6470 ± ? |
 | **모델 구조** | ① clinical+판독지를 §2-1 구조로 **함께** 학습해 위험점수 1개를 뽑고 ② 영상(SimpleCNN)을 §1-3 구조로 따로 학습해 위험점수 1개를 뽑은 뒤 ③ 두 위험점수를 fold별로 CoxPH(lifelines)에 넣어 가중합 계수를 적합 |
-| **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; `sclc.fusion_stack.combine_two`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
+| **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; `sclc.late_fusion.combine_two`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` 그리고 `--target pfs` |
 
 **RadBERT 버전이 OS에서 더 높은데(0.7224) 왜 TF-IDF를 채택했나** — 2-1과 같은 이유. PFS에서 TF-IDF가 크게 앞선다(0.6621 vs 0.6470). 두 타깃 동등 가중이면 TF-IDF, OS만 우선한다면 RadBERT가 방어 가능 — 이 판단 기준은 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §4.6에 정리돼 있다.
@@ -125,7 +125,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **OS** | 0.6811 ± ? |
 | **PFS** | 0.6313 ± ? |
 | **모델 구조** | clinical 단독(§1-1), 판독지 단독 TF-IDF(§1-2), 영상 단독(§1-3)을 **각각 완전히 독립적으로** 학습해 위험점수 3개를 뽑은 뒤, fold별로 CoxPH(lifelines)에 3개 covariate(`risk_image`, `risk_clinical`, `risk_report`)를 넣어 가중합 계수를 적합 |
-| **코드 파일** | `src/sclc/fusion_arms.py` (`run_clinical_only`, `run_report_only`) + `sclc.fusion_stack.combine_weighted_sum` — 실행은 `experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way` |
+| **코드 파일** | `src/sclc/unimodal_arms.py` (`run_clinical_only`, `run_report_only`) + `sclc.late_fusion.combine_weighted_sum` — 실행은 `experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way` |
 | **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py three-way --target os` 그리고 `--target pfs` |
 | **재현성** | image 축은 재학습 없이 `outputs/late_fusion_B/oof_{target}.json`의 저장된 OOF 위험점수를 재사용. clinical·report는 batch32/epoch60으로 새로 학습(2026-07-22의 첫 실행은 batch16/epoch30 이었음, 참고값 OS 0.6703/PFS 0.6288) |
 
