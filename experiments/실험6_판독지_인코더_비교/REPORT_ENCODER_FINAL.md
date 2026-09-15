@@ -386,7 +386,7 @@ PFS는 부호가 뒤집힌다(−0.024)** (§2, §3).
 | 한글 삭제 | 0.00% | 4.0% |
 | 한글 → 영어 치환 | 0.00% | 9.7% |
 
-446항목 치환 사전([ko2en.py](ko2en.py))으로 해결. 고유 한글 덩어리가 400개뿐이고 상위
+446항목 치환 사전([ko2en.py](../../src/sclc/ko2en.py))으로 해결. 고유 한글 덩어리가 400개뿐이고 상위
 50개가 89%를 덮어 **LLM 번역 없이 사전 치환으로 충분**했다(결정론적, 감사 가능, 환자
 텍스트를 외부로 보내지 않아 IRB 이슈 없음).
 
@@ -518,10 +518,22 @@ PFS HR **3.22**, 다변량 14편 중 12편 독립적)인데 원리적으로 접�
 
 ## 부록 B. 코드 · 산출물
 
-**코드**: [exp_bert_text.py](exp_bert_text.py) · [bert_features.py](bert_features.py) ·
-[ko2en.py](ko2en.py) · [exp_radbert_fusion.py](exp_radbert_fusion.py) ·
-`exp_radbert_concat.py`(삭제됨 — 산출물 `outputs/radbert_concat/` 만 남아 있다) · [exp_radbert_full.py](exp_radbert_full.py) ·
-[core/features.py](../core/features.py) · [core/cohort.py](../core/cohort.py)
+**코드** *(2차 정리에서 이름이 바뀌었다 — 옛 명령 ↔ 새 명령 대응표는
+[README.md](README.md) 참고)*:
+[exp_encoder_compare.py](exp_encoder_compare.py) (옛 `exp_bert_text.py`) ·
+[exp_encoder_fusion.py](exp_encoder_fusion.py) (옛 `exp_radbert_fusion.py`) ·
+[exp_encoder_trimodal.py](exp_encoder_trimodal.py) (옛 `exp_radbert_full.py`) ·
+`exp_radbert_concat.py`(삭제됨 — 산출물 `outputs/radbert_concat/` 만 남아 있다) ·
+[src/sclc/encoders/](../../src/sclc/encoders/) (인코더 정의) ·
+[src/sclc/bert_features.py](../../src/sclc/bert_features.py) ·
+[src/sclc/ko2en.py](../../src/sclc/ko2en.py) ·
+[src/sclc/features.py](../../src/sclc/features.py) ·
+[src/sclc/cohort.py](../../src/sclc/cohort.py)
+
+⚠️ 이 문서의 §1·§3·§5 에 나오는 arm 이름(`bert_ko2en`, `tfidf_svd`,
+`tfidf_plus_bert`)과 `--model_name` 옵션은 **당시 실행 기록**이다. 그중 TF-IDF 와
+RadBERT 를 제외한 후보는 2차 정리에서 코드가 삭제됐다 (판정 근거는 이 문서의
+§1.1·§1.2·§5.1 과 부록 C). 수치와 산출물은 전부 그대로 남아 있다.
 
 **결과 원본**: `outputs/bert_text/` · `outputs/diag_*/` · `outputs/reportonly_*/` ·
 `outputs/radbert_*/` · `outputs/legacy_no_brainfix/` (수정 전 보존)

@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 """판독지 텍스트를 frozen 영어 biomedical BERT(RadBERT) 임베딩으로 바꾼다.
 
+[승격 이력 — 2026-08-30]
+  원래 실험6_판독지_인코더_비교/bert_features.py 였다. 실험11(리스크앵커_정합손실)이
+  앵커 문장(LS/ES) 임베딩에 ``embed_corpus`` 를 그대로 재사용해야 했는데,
+  실험끼리 서로 import 하지 않는 저장소 관례상 여기 src/sclc/ 로 옮겼다
+  (fusion_stack.py 가 같은 이유로 승격된 선례와 동일 — 두 실험 이상이 쓰는
+  코드는 실험이 아니라 인프라). 함수 이름·동작은 전부 그대로다.
+
 [동기]
   지금 판독지는 char n-gram TF-IDF(400차원)로만 쓰인다. TF-IDF 는 "글자 조각의
   빈도"라서 의미를 모른다 — "no evidence of metastasis" 와 "metastasis" 가
@@ -12,9 +19,9 @@
   섞여 있다. RadBERT 의 tokenizer 는 영어 전용이라 **한국어를 전부 [UNK] 로**
   바꿔 버린다 (이 코퍼스에서 실측 평균 16.3% 토큰이 [UNK]).
   [UNK] 가 성능을 깎는 원인인지 아닌지를 분리하려고 세 갈래로 잰다:
-    bert_raw   : 원문 그대로 (한국어 -> [UNK])
-    bert_nokr  : 한국어 글자를 지우고 영어만 남김 (strip_korean)
-    bert_ko2en : 한국어 덩어리를 영어 구로 치환 (translate_korean)
+    radbert@raw   : 원문 그대로 (한국어 -> [UNK])
+    radbert@strip : 한국어 글자를 지우고 영어만 남김 (strip_korean)
+    radbert       : 한국어 덩어리를 영어 구로 치환 (translate_korean) -- 채택 설정
   ``tokenization_stats()`` 로 각 arm 의 [UNK] 비율이 실제로 줄었는지 확인한다.
 
 [누수 방지 — 이 저장소의 기존 규율과 동일]
@@ -37,8 +44,8 @@
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 import hashlib
 
@@ -48,12 +55,20 @@ import torch
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
 
-from core import features
+from sclc import cohort, features, ko2en, paths
 
 DEFAULT_MODEL = "StanfordAIMI/RadBERT"
-DEFAULT_CACHE_DIR = "outputs/bert_cache"
+# 절대경로로 잡는다. 상대경로 "outputs/bert_cache" 를 쓰면 스크립트를 어느
+# 디렉터리에서 실행했느냐에 따라 캐시가 다른 곳에 생겨, 있는 캐시를 두고
+# 몇 분짜리 임베딩을 다시 계산한다.
+DEFAULT_CACHE_DIR = paths.outputs("bert_cache")
 # SVD 는 부호/초기화에 난수가 쓰이므로 재현성을 위해 고정한다.
 SVD_RANDOM_STATE = 42
+# 실험6/exp_encoder_trimodal.py 가 낸 공식 RadBERT 수치(MODEL_SUMMARY.md §2-1/§3-2,
+# OS 0.7153/0.7224, PFS 0.6456/0.6470)의 report_dim. do_svd=False 라
+# _reduce_block 이 out_dim(400, 명목값)을 emb_dim 으로 덮어써서 실제로는 768이 된다.
+RADBERT_NOMINAL_OUT_DIM = 400
+RADBERT_REPORT_DIM = 768
 
 
 def _corpus_fingerprint(model_name: str, texts: dict[int, str], max_length: int) -> str:
@@ -146,7 +161,7 @@ def embed_corpus(model_name: str, texts: dict[int, str], max_length: int = 512,
 def tokenization_stats(model_name: str, texts: dict[int, str], max_length: int = 512) -> dict:
     """tokenizer 가 이 텍스트를 어떻게 씹는지에 대한 **집계** 통계.
 
-    한국어 처리 arm(bert_raw/nokr/ko2en)이 정말로 [UNK] 를 줄였는지 확인하는
+    한국어 처리 변형(raw/strip/ko2en)이 정말로 [UNK] 를 줄였는지 확인하는
     용도다. 원문은 일절 반환/출력하지 않고 비율·평균만 낸다 (환자정보 보호).
     """
     from transformers import AutoTokenizer
@@ -293,84 +308,34 @@ def make_text_encoder_fn(embeddings: dict[int, np.ndarray], out_dim: int = 400,
     return fn
 
 
-def make_tfidf_svd_encoder_fn(corpus: dict[int, str], out_dim: int = 400,
-                              tfidf_max_features: int = 400, tfidf_ngram_range=(2, 4),
-                              audit: list | None = None,
-                              do_svd: bool = True, do_scale: bool = True):
-    """TF-IDF 를 **BERT arm 과 똑같은 축소 파이프라인**(train-only SVD + scaler)에 태운다.
+def build_radbert_report_encoder(corpus: dict[int, str] | None = None,
+                                 merged_csv: str = cohort.DEFAULT_MERGED_CSV,
+                                 text_source: str = "concl_find", audit: list | None = None,
+                                 cache_dir: str = DEFAULT_CACHE_DIR):
+    """프로젝트 공식 RadBERT 판독지 인코더 (실험6/exp_encoder_trimodal.py 레시피 그대로).
 
-    [왜 이 통제실험이 필요한가]
-      BERT 블록은 fold당 n_train=171 이라 SVD 성분이 171개로 막히고 나머지는
-      0 패딩이다 -> **실효 랭크 171**. 반면 TF-IDF 블록은 진짜 400차원이다.
-      이 상태로 둘을 비교하면 "BERT 가 졌다"가 "랭크 171 이 랭크 400 에 졌다"와
-      뒤섞여 구분되지 않는다.
+    ko2en 사전 치환 -> frozen RadBERT mean-pooling(768) -> 축소·표준화 없음
+    (do_svd=False, do_scale=False). MODEL_SUMMARY.md §2-1/§3-2 의 RadBERT 수치
+    (OS 0.7153/0.7224, PFS 0.6456/0.6470)를 낸 바로 그 조합이며, 이 함수가 그
+    조합의 **유일한 정의**다 (실험1/6/11 이 각자 인라인으로 들고 있던 걸 여기로
+    승격 -- 코드_구조.md 원칙 2, "같은 개념은 한 곳에만").
 
-      그래서 TF-IDF 를 같은 파이프라인에 통과시켜 똑같이 171 로 깎아 본다:
-        - TF-IDF(171) 도 0.708 근처면  -> 랭크는 병목이 아니고, BERT 가 내용으로 진 것
-        - TF-IDF(171) 이 0.67 근처로 떨어지면 -> BERT arm 들이 랭크 때문에 손해를 본
-          것이므로, 지금까지의 BERT 수치는 **과소평가**이고 다시 재야 한다
+    [누수 없음] embed_corpus 는 frozen+no_grad+문서 단위 계산이라 fold 와 무관하게
+    전역 1회 계산해도 된다(모듈 docstring 참고). make_text_encoder_fn 을
+    do_svd=False, do_scale=False 로 부르면 _reduce_block 안의 SVD/StandardScaler
+    fit 이 둘 다 스킵되므로 fit() 이 아예 호출되지 않는다 -- TF-IDF 경로(train
+    fold로 vocabulary/idf 를 fit)보다도 더 엄격하게 fold-safe 하다.
 
-    누수 방지는 make_text_encoder_fn 과 동일하다 — TF-IDF vocabulary, SVD 기저,
-    StandardScaler 셋 다 train fold 로만 fit 한다.
+    [경고] text_source 나 ko2en 변형을 바꾸면 embed_corpus 캐시 지문이 달라져서
+    **에러 없이** 다른 임베딩이 나온다. 기존 체크포인트(outputs/late_fusion_B_radbert)
+    를 재현하려면 기본값을 바꾸지 마라.
     """
-    def fn(train_ids, val_ids, test_ids):
-        ids_by_split = {"train": train_ids, "val": val_ids, "test": test_ids}
-        tfidf_enc = features.TfidfEncoder(max_features=tfidf_max_features,
-                                          ngram_range=tfidf_ngram_range)
-        texts = {name: [corpus.get(int(rid), "") for rid in ids]
-                 for name, ids in ids_by_split.items()}
-        tfidf_enc.fit(texts["train"])
-        mats = {
-            name: (tfidf_enc.transform(t) if len(t)
-                   else np.empty((0, tfidf_enc.max_features), dtype="float32"))
-            for name, t in texts.items()
-        }
-        return _reduce_block(mats, out_dim, {"block": "tfidf_svd",
-                                             "tfidf_dim": int(tfidf_enc.max_features)},
-                             audit, do_svd=do_svd, do_scale=do_scale)
+    # 레시피의 유일한 정의는 sclc.encoders.RadBertReportEncoder 의 기본값이다.
+    # (순환 import 를 피하려고 함수 안에서 import 한다 — encoders 가 이 모듈을 쓴다.)
+    from sclc.encoders import RadBertReportEncoder
 
-    return fn
-
-
-def make_tfidf_plus_bert_encoder_fn(corpus: dict[int, str], embeddings: dict[int, np.ndarray],
-                                    tfidf_max_features: int = 400, tfidf_ngram_range=(2, 4),
-                                    bert_out_dim: int = 200, audit: list | None = None):
-    """[TF-IDF | BERT축소] 를 가로로 이어붙인 텍스트 블록 생성기.
-
-    "BERT 가 TF-IDF 를 **대체**하는가"가 아니라 "**보완**하는가"를 보는 arm 이다.
-    TF-IDF 쪽은 features.TfidfEncoder 를 그대로 재사용하므로 기준선 arm 과
-    완전히 같은 계산이고(역시 train fold 로만 fit), BERT 쪽만 덧붙는다.
-    bert_out_dim 은 기본 200 — 400+200=600 이면 기준선 400 대비 1.5배로,
-    폭 증가를 최소로 누르면서 보완 효과를 볼 수 있는 절충이다.
-    (폭을 400+400=800 으로 하면 폭 2배가 되어 '폭 때문에 나빠졌다'와
-     'BERT 가 도움이 안 됐다'가 섞여 버린다.)
-    """
-    def fn(train_ids, val_ids, test_ids):
-        ids_by_split = {"train": train_ids, "val": val_ids, "test": test_ids}
-
-        # ── TF-IDF 절반: 기준선과 동일하게 train fold 텍스트로만 vocabulary fit ──
-        tfidf_enc = features.TfidfEncoder(max_features=tfidf_max_features,
-                                          ngram_range=tfidf_ngram_range)
-        texts = {name: [corpus.get(int(rid), "") for rid in ids]
-                 for name, ids in ids_by_split.items()}
-        tfidf_enc.fit(texts["train"])
-        tfidf_blocks = {
-            name: (tfidf_enc.transform(t) if len(t)
-                   else np.empty((0, tfidf_enc.max_features), dtype="float32"))
-            for name, t in texts.items()
-        }
-
-        # ── BERT 절반: 위와 동일한 fold-safe 축소 ──
-        emb_dim = len(next(iter(embeddings.values())))
-        mats, missing = {}, {}
-        for name, ids in ids_by_split.items():
-            mats[name], missing[name] = _stack_embeddings(embeddings, ids, emb_dim)
-        bert_blocks = _reduce_block(
-            mats, bert_out_dim,
-            {"block": "tfidf+bert", "tfidf_dim": int(tfidf_enc.max_features),
-             "n_missing_embedding": missing}, audit)
-
-        return {name: np.concatenate([tfidf_blocks[name], bert_blocks[name]], axis=1).astype("float32")
-                for name in ids_by_split}
-
-    return fn
+    if corpus is None:
+        corpus, _ = features.load_text_corpus(merged_csv, source=text_source)
+    encoder = RadBertReportEncoder(out_dim=RADBERT_NOMINAL_OUT_DIM, cache_dir=cache_dir,
+                                   audit=[] if audit is None else audit)
+    return encoder.build_encoder_fn(corpus)

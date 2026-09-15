@@ -44,8 +44,8 @@
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 import csv
 import re
@@ -54,7 +54,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from core import cohort
+from sclc import cohort
 
 # 범례 문장. "괄호안 숫자는 maxSUV임" / "괄호 안의 숫자는 max SUV 임" 등 띄어쓰기·조사
 # 변형을 흡수한다. (원안 r'괄호\s?안?\s?숫자는' 은 236건, 이 정규식은 237건을 잡는다.

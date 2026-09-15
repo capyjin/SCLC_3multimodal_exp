@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 """판독지 안의 한글을 영어로 바꾸는 **고정 치환 사전**.
 
+[승격 이력 — 2026-08-30]
+  원래 실험6_판독지_인코더_비교/ko2en.py 였다. 실험11(리스크앵커_정합손실)이
+  판독지를 RadBERT 로 임베딩하기 전 ko2en 치환을 그대로 재사용해야 했는데,
+  실험끼리 서로 import 하지 않는 저장소 관례상 여기 src/sclc/ 로 옮겼다
+  (bert_features.py 가 같은 이유로 승격된 선례와 동일). 함수 이름·동작은
+  전부 그대로다.
+
 왜 필요한가
 -----------
 판독지는 글자 기준 영문 63.7% / 한글 8.8% 로, 의학 내용은 대부분 영어이고
@@ -40,8 +47,8 @@ fold별로 다시 만들 필요가 없다.
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 
 import re
 
@@ -581,8 +588,8 @@ def coverage(texts) -> dict:
 
 
 if __name__ == "__main__":
-    from core import cohort
-    from core.features import load_text_corpus
+    from sclc import cohort
+    from sclc.features import load_text_corpus
 
     corpus, _ = load_text_corpus(cohort.DEFAULT_MERGED_CSV)
     docs = list(corpus.values())
