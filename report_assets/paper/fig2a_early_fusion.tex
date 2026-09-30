@@ -1,0 +1,140 @@
+% (a) Early fusion (concat) — 원본 이미지를 픽셀 좌표 그대로 벡터로 재현한 패널.
+% 좌표 단위 = 원본 PNG 픽셀 (609x690), 1px = 0.0127cm (200dpi). y 는 아래 방향.
+\documentclass[border=0pt]{standalone}
+\usepackage{tikz}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usetikzlibrary{arrows.meta,calc}
+
+\definecolor{ink}{HTML}{1A1A1A}
+\definecolor{boxyellow}{HTML}{FDF3C9}
+\definecolor{boxgray}{HTML}{E9E9E9}
+\definecolor{boxblue}{HTML}{CFE3F7}
+\definecolor{boxpurple}{HTML}{E2D6F2}
+\definecolor{boxpink}{HTML}{F9D2CC}
+\definecolor{edgeyellow}{HTML}{D8B24C}
+\definecolor{edgegray}{HTML}{7F7F7F}
+\definecolor{edgeblue}{HTML}{538EC6}
+\definecolor{edgepurple}{HTML}{8C71BC}
+\definecolor{edgepink}{HTML}{D5857A}
+\definecolor{bargray}{HTML}{C4C4C4}
+\definecolor{barpink}{HTML}{E6AEA7}
+\definecolor{septint}{HTML}{C8C8C8}
+\definecolor{graytext}{HTML}{8F8F8F}
+
+\newcommand{\main}{\fontsize{8.8889}{10.6667}\selectfont}
+\newcommand{\iconfont}{\fontsize{4.7778}{5.7333}\selectfont}
+\newcommand{\hdrfont}{\fontsize{4.5444}{5.4533}\selectfont}
+\newcommand{\repfont}{\fontsize{3.8333}{4.6}\selectfont}
+\newcommand{\tinyfont}{\fontsize{4.5556}{5.4667}\selectfont}
+\newcommand{\lltwo}{\fontsize{5.7778}{6.9333}\selectfont}
+
+\begin{document}
+\scalebox{0.9}{%
+\begin{tikzpicture}[x=0.014111111cm, y=-0.014111111cm,
+  every node/.style={inner sep=0pt, outer sep=0pt, text=ink},
+  blk/.style={draw=#1, line width=0.5556pt, rounded corners=2.2pt},
+  blk/.default=ink,
+  icon/.style={line width=0.5556pt, rounded corners=3pt},
+  arr/.style={-{Latex[length=0.8667mm,width=0.9444mm]}, draw=ink,
+              line width=0.5556pt},
+  sep/.style={draw=septint, line width=0.3333pt,
+              dash pattern=on 0.2222pt off 0.7222pt}]
+
+\useasboundingbox (0,0) rectangle (609,690);
+% 점선 컨테이너 (end-to-end 로 학습되는 모델 하나)
+\draw[draw=ink, line width=0.5556pt, rounded corners=1.4444mm, dash pattern=on 3.6256pt off 2.3167pt, dash phase=5.0556pt] (13,71) rectangle (594,447);
+
+% Cox head / concat 블록
+\draw[blk=edgeyellow, fill=boxyellow] (40,87) rectangle (567,143);
+\draw[blk=edgegray, fill=boxgray]   (61,173) rectangle (546,230);
+\node[anchor=base] at (303.5,121.0) {\main Cox head (one loss, one schedule)};
+\node[anchor=base] at (303.5,207.5) {\main concat: $128\oplus128\oplus16=272$};
+
+% 모달리티 브랜치
+\draw[blk=edgeblue, fill=boxblue]   (49,363) rectangle (194,422);
+\draw[blk=edgepurple, fill=boxpurple] (231,363) rectangle (376,422);
+\draw[blk=edgepink, fill=boxpink]   (397,363) rectangle (574,422);
+\node[anchor=base] at (121,401.0) {\main CNN};
+\node[anchor=base] at (303.5,401.0) {\main MLP};
+\node[anchor=base] at (485.5,401.0) {\main RadBERT--MLP};
+
+% $\ell_2$ 정규화 원
+\draw[draw=ink, line width=0.6111111111111112pt, fill=white] (121.15,283.5) circle (18.3);
+\node at (121.15,283.5) {\lltwo $\ell_2$};
+\draw[draw=ink, line width=0.6111111111111112pt, fill=white] (303.5,283.5) circle (18.3);
+\node at (303.5,283.5) {\lltwo $\ell_2$};
+\draw[draw=ink, line width=0.6111111111111112pt, fill=white] (485.55,283.5) circle (18.3);
+\node at (485.55,283.5) {\lltwo $\ell_2$};
+
+% 화살표 (아이콘 -> 브랜치 -> $\ell_2$ -> concat -> Cox head -> risk)
+\draw[arr] (121.15,485) -- (121.15,423.5);
+\draw[arr] (121.15,362) -- (121.15,304.5);
+\draw[arr] (121.15,263) -- (121.15,231.5);
+\draw[arr] (303.5,485) -- (303.5,423.5);
+\draw[arr] (303.5,362) -- (303.5,304.5);
+\draw[arr] (303.5,263) -- (303.5,231.5);
+\draw[arr] (485.55,485) -- (485.55,423.5);
+\draw[arr] (485.55,362) -- (485.55,304.5);
+\draw[arr] (485.55,263) -- (485.55,231.5);
+\draw[arr] (303.5,172) -- (303.5,144.5);
+\draw[arr] (303.5,86) -- (303.5,43.5);
+\node[anchor=base] at (303.5,36.0) {\main risk};
+
+% 아이콘 1 — PET-CT MIP (본문 이미지는 원본 래스터를 그대로 넣는다)
+\begin{scope}
+  \clip[rounded corners=3pt] (59,486) rectangle (183,619);
+  \fill[boxblue] (59,486) rectangle (183,507);
+  \node[anchor=north west] at (60,507) {\includegraphics[width=49.2pt,height=44.8pt]{assets/pet_body.png}};
+\end{scope}
+\draw[icon, draw=edgeblue] (59,486) rectangle (183,619);
+\node[anchor=base] at (121,499.5) {\hdrfont PET--CT MIP};
+
+% 아이콘 2 — 임상 변수 표
+\fill[white] (242,486) rectangle (365,619);
+\fill[boxpurple] (242,486) rectangle (365,507);
+\draw[icon, draw=edgepurple] (242,486) rectangle (365,619);
+\node[anchor=base] at (303.5,499.5) {\hdrfont Clinical variables};
+\node[anchor=base west] at (249.5,524.5) {\iconfont Age};
+\node[anchor=base east] at (357.5,524.5) {\iconfont 67};
+\node[anchor=base west] at (249.5,542.0) {\iconfont Sex};
+\node[anchor=base east] at (357.5,542.0) {\iconfont M};
+\node[anchor=base west] at (249.5,559.0) {\iconfont Stage};
+\node[anchor=base east] at (357.5,559.0) {\iconfont ED};
+\node[anchor=base west] at (249.5,576.0) {\iconfont ECOG};
+\node[anchor=base east] at (357.5,576.0) {\iconfont 1};
+\node[anchor=base west] at (249.5,593.0) {\iconfont LDH};
+\node[anchor=base east] at (357.5,593.0) {\iconfont 412};
+\draw[sep] (249,530) -- (358,530);
+\draw[sep] (249,547) -- (358,547);
+\draw[sep] (249,564) -- (358,564);
+\draw[sep] (249,580.5) -- (358,580.5);
+\draw[sep] (249,597) -- (358,597);
+\node[anchor=base, text=graytext] at (303.5,609.0) {\tinyfont 21 features};
+
+% 아이콘 3 — 판독지
+\fill[white] (424,486) rectangle (547,619);
+\fill[boxpink] (424,486) rectangle (547,507);
+\draw[icon, draw=edgepink] (424,486) rectangle (547,619);
+\node[anchor=base] at (485.5,499.5) {\hdrfont Radiology report};
+\node[anchor=base west] at (432,521.0) {\repfont FINDINGS};
+\node[anchor=base west] at (432,585.0) {\repfont IMPRESSION};
+\fill[bargray] (431,524) rectangle (539,527.6);
+\fill[bargray] (431,531) rectangle (525,534.6);
+\fill[bargray] (431,538) rectangle (539,541.6);
+\fill[bargray] (431,545) rectangle (503,548.6);
+\fill[barpink] (431,552) rectangle (499,555.6);
+\fill[bargray] (501,552) rectangle (531,555.6);
+\fill[bargray] (431,559) rectangle (533,562.6);
+\fill[bargray] (431,566) rectangle (493,569.6);
+\fill[bargray] (431,589) rectangle (539,592.6);
+\fill[bargray] (431,596) rectangle (516,599.6);
+\fill[barpink] (431,603) rectangle (509,606.6);
+
+% 패널 캡션
+\node[anchor=base] at (303.5,663.0) {\main (a) Early fusion (concat)};
+
+\end{tikzpicture}}
+\end{document}

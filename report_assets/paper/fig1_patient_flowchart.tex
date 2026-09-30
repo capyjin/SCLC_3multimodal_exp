@@ -1,0 +1,72 @@
+% Figure 1 — Patient selection flowchart (Cancer Imaging 관례: 세로 주 흐름 + 오른쪽 제외 상자).
+% 수치 출처(하드코딩 전 재계산 확인, 2026-09-30):
+%   321 / 64 / 257            src/sclc/cohort.py::build_manifest()  (has_image, exclusion_reason)
+%   9 / 8 / 2 -> 238          no_report / EVIDENCE_CONFIRMED_LEAK_IDS / report_date 결측(57, 280)
+%   LS 72, ES 166, 사건 수      load_trimodal_cohort()  (stage, os_event, pfs_event)
+%   진단일 2014-01 ~ 2025-01   data/20260619 SCLC PET 전달용.xlsx '진단일' (238명 기준)
+%   fold 크기                   data/splits/trimodal_common_5fold_seed42_v1.csv
+% 데이터나 split 이 바뀌면 위 함수로 다시 세고 이 파일의 숫자를 고칠 것.
+\documentclass[tikz,border=6pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[x=1cm,y=1cm,
+  flow/.style={blk=white, text width=60mm, inner ysep=4pt},
+  excl/.style={blk=boxgray, text width=64mm, align=left, anchor=west, inner ysep=4pt},
+  part/.style={blk=#1, text width=24mm, inner ysep=3pt},
+  line/.style={draw=navy, line width=0.75pt},
+]
+
+% ---------------- main flow ----------------
+\node[flow] (all) at (0,0)
+  {Patients with SCLC and clinical follow-up data\\
+   \textbf{n = 321}};
+
+\coordinate (j1) at (0,-1.35);
+\node[excl] (ex1) at (3.9,-1.35)
+  {\textbf{Excluded (n = 64)}\\
+   No pretreatment PET-CT image (n = 64)};
+
+\node[flow] (img) at (0,-2.7)
+  {Patients with clinical data and PET-CT\\
+   \textbf{n = 257}};
+
+\coordinate (j2) at (0,-4.25);
+\node[excl] (ex2) at (3.9,-4.25)
+  {\textbf{Excluded (n = 19)}\\
+   No usable radiology report (n = 9)\\
+   Report dated after disease progression (n = 8)\\
+   Report date unavailable (n = 2)};
+
+\node[flow, line width=1.1pt] (final) at (0,-5.95)
+  {\textbf{Final study cohort (n = 238)}\\
+   {\scriptsize Diagnosed January 2014 -- January 2025}\\
+   {\scriptsize LS-SCLC 72 (30.3\%) / ES-SCLC 166 (69.7\%)}\\
+   {\scriptsize OS events 199 (83.6\%)}\\
+   {\scriptsize PFS events 212 (89.1\%)}};
+
+\node[flow] (cv) at (0,-7.9)
+  {Patient-level 5-fold cross-validation\\
+   {\scriptsize stratified by OS/PFS event status (seed 42)}};
+
+% per-fold partitions (색은 fig1 late-fusion 격자와 같음: fit=노랑, eval=분홍)
+\node[part=cellfit!55]  (tr) at (-2.75,-9.55) {Training\\ \textbf{n = 171}};
+\node[part=boxgray]     (va) at (0,-9.55)     {Validation\\ \textbf{n = 19--20}};
+\node[part=celleval!55] (te) at (2.75,-9.55)  {Test\\ \textbf{n = 47--48}};
+\node[lab, below=1.5mm of va]
+  {Numbers per fold; each patient appears in exactly one test fold};
+
+% ---------------- arrows ----------------
+\draw[arr] (all) -- (img);
+\draw[arr] (img) -- (final);
+\draw[arr] (final) -- (cv);
+\draw[arr] (j1) -- (ex1.west);
+\draw[arr] (j2) -- (ex2.west);
+
+\coordinate (fork) at (0,-8.75);
+\draw[line] (cv.south) -- (fork);
+\draw[arr] (fork) -| (tr.north);
+\draw[arr] (fork) -- (va.north);
+\draw[arr] (fork) -| (te.north);
+
+\end{tikzpicture}
+\end{document}
