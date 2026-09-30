@@ -9,7 +9,7 @@
 결과(RESULTS.md §9.4): 이미지를 넣으면 이미지가 발언권의 70~80%를 가져가고,
 잘하던 판독지가 54% → 17% 로 밀려난다.
 
-⚠️ 단, 발언권을 인위적으로 낮춰도 성능은 변하지 않았다(§9.4.2, exp_balance_dims).
+⚠️ 단, 발언권을 인위적으로 낮춰도 성능은 변하지 않았다(§9.4.2, exp_balance_dims — 삭제됨, archive/before-cleanup-2026-09-30 태그).
    즉 발언권 독점은 **증상이지 원인이 아니다.**
 
 Run:  T=os python 실험4_영상_발언권독점_진단/analyze_contribution.py

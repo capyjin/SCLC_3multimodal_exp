@@ -270,7 +270,7 @@ in-sample 점수는 fold에 따라 진짜 OOF보다 C-index가 최대 +0.10까�
 "이 기준선 = 공식 late fusion"이라는 등식뿐이다. OS를 TF-IDF로 재실행해도(PFS는 이미
 TF-IDF) 이 실험 내부의 FAIL 결론은 동일하다. 상세 아키텍처·fold별 수치와 여기 싣지
 않은 변형(M1 attention, prior 게이트)은
-[experiments/실험11_MoE/RESULTS_ALL.md](experiments/실험11_MoE/RESULTS_ALL.md) 참고 — 단, 그 문서 §5가 이
+`experiments/실험11_MoE/RESULTS_ALL.md`(2026-09-30 삭제, `archive/before-cleanup-2026-09-30` 태그에 보존) 참고 — 단, 그 문서 §5가 이
 차이를 "재구성 오차"로 서술한 것은 부정확하다(오차가 아니라 in-sample/OOF 방법론
 차이).
 

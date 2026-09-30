@@ -21,8 +21,8 @@
   exp_cnn_radiomics_corr.py 와 같은 방법론).
 
 Run:
-  python 실험11_MoE/exp_radimagenet.py                       # 본실행(오래 걸림)
-  python 실험11_MoE/exp_radimagenet.py --smoke                # 경로 점검용
+  python experiments/실험8_영상단독_고전CoxPH/exp_radimagenet.py                       # 본실행(오래 걸림)
+  python experiments/실험8_영상단독_고전CoxPH/exp_radimagenet.py --smoke                # 경로 점검용
 """
 import os
 import sys

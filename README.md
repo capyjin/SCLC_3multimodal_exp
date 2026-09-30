@@ -41,7 +41,7 @@ PET-CT 영상 · 임상변수 · 판독지 텍스트를 결합한 소세포폐�
 | 결정 | 근거 |
 |---|---|
 | 판독지 = RadBERT | 판독지 단독에서 TF-IDF 를 유의하게 앞섬(Δ+0.034, p=0.027). OS 는 모든 융합 방식에서 RadBERT 가 앞섬 — RESULTS_TABLE_final.md 표2·표3 |
-| 영상 = SimpleCNN | 단독 OS 0.657 로 ImageNet ResNet18(0.633)·RadImageNet ResNet50(0.616)보다 높음 — RESULTS.md §8, `outputs/image_radimagenet/results.json`(실험11 `exp_radimagenet.py`) |
+| 영상 = SimpleCNN | 단독 OS 0.657 로 ImageNet ResNet18(0.633)·RadImageNet ResNet50(0.616)보다 높음 — RESULTS.md §8, `outputs/image_radimagenet/results.json`(실험8 `exp_radimagenet.py`) |
 | 융합 = late 2-way | 같은 조건에서 early concat(0.6879)·late 3-way(0.7045)보다 OS 가 높음 — 표3-1 (실험12) |
 | 묶음 = [임상+판독지] + 영상 | 다른 묶음 [임상+영상]+판독지(0.6894), [판독지+영상]+임상(0.6733)보다 OS 가 높음, G2 대비 5/5 fold(p=0.010) — 표3-2 (실험13) |
 | PFS 도 같은 모델 | 저자 결정. PFS 에서는 세 융합 구조·세 묶음이 서로 구분되지 않는다(표3-1·3-2) |

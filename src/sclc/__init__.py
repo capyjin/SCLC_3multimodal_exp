@@ -19,7 +19,6 @@
   ko2en               판독지 한국어 -> 영어 구 치환 사전 (446항목)
   bert_features       frozen BERT 임베딩 · 캐시 · fold-safe 축소 블록
   encoders/           ★ ReportEncoder(ABC) + TF-IDF / RadBERT — 인코더 후보의 유일한 정의
-  expert_embeddings   앵커 문장 임베딩
 
 모델
   model               영상 백본 · 브랜치 · ConcatDeepSurv(모달리티 on/off) · 모달 조합표

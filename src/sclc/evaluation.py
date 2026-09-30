@@ -19,8 +19,8 @@ def concordant_pair_counts(durations, events, risks) -> tuple[float, float]:
     fold 내부·서브그룹 내부처럼 **같은 척도의 위험점수끼리만** 비교하는 것이
     전제다. 여러 fold/서브그룹의 (conc, comp) 를 합산한 뒤 conc/comp 를 내면
     pooled-OOF concordance_index 와 달리 fold 간 위험점수 스케일 drift가
-    섞이지 않는다(실험9_병기별_stage_aware_융합/RESULTS_stage_aware_fusion.md
-    §4.1 이 실측으로 확인한 함정 — 원래 두 실험 폴더에 복붙돼 있던 정의를
+    섞이지 않는다(실험9 병기별 융합 §4.1 이 실측으로 확인한 함정 — 실험9 는 2026-09-30
+    삭제, 보고서는 archive/before-cleanup-2026-09-30 태그 — 원래 두 실험 폴더에 복붙돼 있던 정의를
     여기로 승격했다).
     """
     durations = np.asarray(durations, dtype=float)

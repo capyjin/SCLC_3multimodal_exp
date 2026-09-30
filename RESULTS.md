@@ -49,7 +49,7 @@
 10-R. **★[2026-09-17 재검정] 위 10번의 PFS 결론은 철회한다 (섹션 10 머리말 · 섹션 11).** 위 수치는 **TF-IDF 인코더 + `brain_meta` 수정 전** 조건의 것이다. 현재 최종 모델(**RadBERT + brain 수정**, 논문 Table 2)로 같은 검정 4종을 다시 돌리면 **OS는 그대로이거나 더 강해지는데(β=+0.327 p=0.0042, 우도비 χ²=7.74 p=0.0054, 난수 승률 1/200) PFS가 달라진다: β=+0.008(p=0.948) → **+0.177 [−0.021, +0.375] (p=0.080)**, fold 부호 **2/5 → 5/5 전부 양수**, 우도비 χ²=0.00 → **3.00**, 난수 승률 **73% → 10.5%**, 그리고 PFS C-index 가 **떨어지지 않는다**(0.6456 → 0.6470).** → **"PFS는 정보량이 문자 그대로 0", "난수와 동등", "재료의 문제라 해결 불가"는 전부 철회.** 정확한 서술은 **"OS는 확립(p=0.004), PFS는 방향은 일관되나 미확립(p=0.080)"**. ⚠️ 두 조건이 동시에 바뀌었으므로 이 변화를 RadBERT 하나의 공으로 돌릴 수 없다.
 11. **섹션 9와 섹션 10은 서로 다른 문제 — 섞지 말 것.** 섹션 9(**concat**)는 "섞는 방법의 문제"(이미지가 발언권 독점 → OS·PFS 둘 다 −0.030)이고 fusion을 바꾸면 해결됨(실제로 late fusion에서 OS 0.722로 회복). 섹션 10(**late**)의 PFS 문제는 "**재료의 문제**"(이미지에 PFS 정보가 없음)이라 **fusion을 아무리 개선해도 해결 불가.** → PFS에서 영상을 살리려면 fusion 기법이 아니라 **영상에서 다른 정보를 뽑아야 함**(치료 전후 변화량, radiomics 등). ⚠️ **재검정 후 이 단정은 약화됨** — PFS 영상 계수가 5/5 fold 양수(β=+0.177, p=0.080)이므로 "정보가 없다"가 아니라 "근거가 아직 모자라다"가 맞다(10-R 항목).
 12. **발언권을 고치려는 시도 세 갈래 — 전부 실패 (섹션 9.7).** ⓐ 브랜치에 학습되는 "음량 손잡이" 추가 → **손잡이가 1.0에서 안 움직임**(6개 실험 전부). 선형 head와 **수학적으로 중복**이라 무효. ⓑ 판독지 차원 확대(16→64/128) → 이미지 없는 조건에서도 **떨어짐**(0.668→0.629/0.653), 과적합만 늘어남. ⓒ 학습 중 이미지 gradient 감쇠(OGM-GE) → 배치 69~80%에서 0.53~0.72배로 눌렀으나 **발언권 46.1%→46.0% 불변**, 성능도 유의한 개선 없음(전부 p>0.16). **10개 변형 중 목표선(clin+report 0.708/0.668, late fusion 0.722)을 넘은 것이 없다.**
-13. **세 실패가 남긴 두 가지 교훈.** ⑴ **ⓐ의 실패가 9.4 진단을 확정했다** — 모델에게 줄일 권한을 새로 줘도 안 쓰므로, "줄일 수 없어서"가 아니라 **"줄이고 싶지 않아서"** 다(= 구조가 아니라 최적화 문제, modality competition). ⑵ **ⓒ의 실패로 알게 된 것** — gradient 감쇠는 학습 **"속도"만** 늦추고 **"도착지"는 못 바꾼다**(60 epoch면 천천히라도 같은 곳에 도착). 그래서 **late fusion이 성공한 이유**도 설명된다: 학습 트릭이 아니라 **가중치를 정하는 기준 자체가 달랐다**(훈련 데이터가 아닌 out-of-fold로 판단 → 이미지 0.30 대 tabular 4.44). → 다음은 **손실 함수를 바꾸는 방향**(head 이미지 몫에 직접 벌점) 또는 **입력의존 게이트(GMU)**. 상세: [RESULTS_ogm_ge.md](experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
+13. **세 실패가 남긴 두 가지 교훈.** ⑴ **ⓐ의 실패가 9.4 진단을 확정했다** — 모델에게 줄일 권한을 새로 줘도 안 쓰므로, "줄일 수 없어서"가 아니라 **"줄이고 싶지 않아서"** 다(= 구조가 아니라 최적화 문제, modality competition). ⑵ **ⓒ의 실패로 알게 된 것** — gradient 감쇠는 학습 **"속도"만** 늦추고 **"도착지"는 못 바꾼다**(60 epoch면 천천히라도 같은 곳에 도착). 그래서 **late fusion이 성공한 이유**도 설명된다: 학습 트릭이 아니라 **가중치를 정하는 기준 자체가 달랐다**(훈련 데이터가 아닌 out-of-fold로 판단 → 이미지 0.30 대 tabular 4.44). → 다음은 **손실 함수를 바꾸는 방향**(head 이미지 몫에 직접 벌점) 또는 **입력의존 게이트(GMU)**. 상세: `RESULTS_ogm_ge.md` (2026-09-30 삭제, `archive/before-cleanup-2026-09-30` 태그)
 
 14. **★[2026-09-17] 영상 신호의 정체를 규명했다 — 크롭 아티팩트가 아니라 대사 종양부하 (섹션 11).** 실험10이 "전역 통계 6개만으로 OS 0.6479 (CNN 0.6570)"를 보여 **체격·크롭 같은 아티팩트를 본 것 아니냐**는 위협이 있었다. 그 6개를 성질로 쪼개니 답이 갈렸다: `w`/`h`(크롭 기하)는 종양 지표와 **전혀 안 붙고**(LDH ρ=+0.124/+0.023, n.s.), `mean`/`std`/`frac_hot`/`frac_dark`(강도)는 LDH·병기·간전이와 **전부 유의하게** 붙는다(예: `std` ρ=+0.365/+0.251/+0.307) — 즉 후자는 교란이 아니라 **종양부하 측정치**다. **진짜 교란인 기하만 통제하면 β_img 가 살아남는다: +0.275 [+0.040, +0.509], p=0.0216, 우도비 χ²=5.01 p=0.0252.** 기하 단독은 tabular 에 유의한 기여조차 없다(p=0.0605). 영상 위험점수는 LDH(+0.364)·간전이(+0.335)·병기(+0.209)와 붙고 **볼 수 없어야 할 뇌전이(−0.013)·FEV1(−0.037)과는 안 붙는다**(음성 대조 통과). ⚠️ **단, CNN 위험점수 분산의 67%가 그 6개로 선형 설명된다** — 딥러닝이 새 바이오마커를 발견한 게 아니라 **MIP이 담은 대사 종양부하를 경량 CNN이 회수**하는 것이다. 논문 표현을 여기에 맞춰야 한다.
 
@@ -426,8 +426,6 @@ tools/plot_all_figures.py                                  # fig1, fig4~fig12 �
 측정 방법: 각 모달리티가 만들어낸 위험점수 기여분의 **표준편차**(환자마다 점수를 얼마나
 흔드는지)를 계산해 비율로 환산했다.
 
-![contribution mismatch](report_assets/fig8_contribution_mismatch.png)
-
 **표 9-3. 최종 위험점수를 흔드는 비중 (= 발언권)** ← *PPT 핵심 표*
 
 | 타깃 | 조합 | Image | Clinical | Report |
@@ -452,8 +450,6 @@ tools/plot_all_figures.py                                  # fig1, fig4~fig12 �
 표 9-2를 보면 이미지를 더했을 때 효과가 정반대다: Clinical 혼자에 더하면 **+0.015~+0.031**,
 Clinical+Report에 더하면 **−0.029~−0.030**. 같은 브랜치를 같은 방식(concat)으로 더하는데
 왜 결과가 반대인지 표 9-3을 다시 보면 답이 나온다.
-
-![same image different outcome](report_assets/fig9_same_image_different_outcome.png)
 
 **이미지의 "행동"은 두 경우 모두 똑같다** — 80%(2-modal) → 70~74%(3-modal)로, **어느 경우든
 발언권을 압도적으로 가져간다.** 다른 건 이미지가 **누구를 밀어냈는지, 그리고 그 자리에
@@ -528,9 +524,9 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 - 즉 발언권 46%는 **`image_proj_dim=128` vs `report_hidden=(32,16)`이라는 설계 선택의 결과**다.
 
 **그래서 직접 실험했다 — 이미지 칸을 판독지와 같은 16으로 줄이면?**
-([experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py](experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py), `outputs/balance_dims/`)
+(`exp_balance_dims.py` — 2026-09-30 삭제, `archive/before-cleanup-2026-09-30` 태그 / `outputs/balance_dims/`)
 > ⚠️ 이 교정 시도는 **폐기**됐다(채택 모델은 late fusion 2-way). 아래 결과와 결론은
-> 그대로 유효하고 스크립트도 남아 있다 — [실험4 README](experiments/실험4_영상_발언권독점_진단/README.md).
+> 그대로 유효하다. 스크립트는 2026-09-30 삭제했고 태그에 보존돼 있다 — [실험4 README](experiments/실험4_영상_발언권독점_진단/README.md).
 
 **표 9-4c. `image_proj_dim` 128 → 16 (다른 조건 전부 고정)**
 
@@ -716,12 +712,12 @@ head는 bias 없는 선형층이므로 모델은 **head 가중치만으로도 �
 > 로 판단해서 이미지에 tabular의 15분의 1(0.30 대 4.44)만 부여했다.
 > 따라서 학습 트릭으로는 흉내낼 수 없다.
 
-자세한 내용: [RESULTS_ogm_ge.md](experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md)
+자세한 내용: `RESULTS_ogm_ge.md` (2026-09-30 삭제, `archive/before-cleanup-2026-09-30` 태그)
 
 > ⚠️ OGM-GE 를 비롯한 §9.7 의 융합 교정 시도는 전부 **폐기**됐다 — 채택 모델은
 > late fusion 2-way 다. 어느 스크립트가 폐기이고 어느 진단 스크립트가 현역인지는
 > [실험4 README](experiments/실험4_영상_발언권독점_진단/README.md) 에 정리돼 있다.
-> 같은 방향의 후속 시도와 그 결과는 실험11(MoE 게이트)·실험12(융합 구조 조건통일).
+> 같은 방향의 후속 시도와 그 결과는 실험11(MoE 게이트, 삭제·태그 보존)·실험12(융합 구조 조건통일).
 
 #### 9.7.4 세 시도의 성능 전체 표
 
@@ -796,12 +792,13 @@ T=os  python experiments/실험4_영상_발언권독점_진단/analyze_contribut
 python experiments/실험4_영상_발언권독점_진단/analyze_redundancy.py
 
 # ④ 구조 수정 시도 A·B (10개 변형, 각 타깃 ~90분)  — 9.7.1, 9.7.2
+# ⚠️ ④·⑥ 스크립트는 2026-09-30 삭제. 복원: git checkout archive/before-cleanup-2026-09-30 -- experiments/실험4_영상_발언권독점_진단/
 python experiments/실험4_영상_발언권독점_진단/exp_fusion_fix.py --target pfs
 python experiments/실험4_영상_발언권독점_진단/exp_fusion_fix.py --target os
 
 # ⑤ 학습 전략 시도 C (OGM-GE)  — 9.7.3
 # ⚠️ exp_ogm_ge.py 는 저장소에 없다(정리 시 삭제). 아래는 당시 실행한 명령의 기록이며,
-#    결과는 outputs/ogm_ge/ 와 experiments/실험4_영상_발언권독점_진단/RESULTS_ogm_ge.md 에 남아 있다.
+#    결과는 outputs/ogm_ge/ 에 남아 있다 (보고서 RESULTS_ogm_ge.md 는 2026-09-30 삭제, 태그에 보존).
 python exp_ogm_ge.py --target os  --alpha 0.5
 python exp_ogm_ge.py --target os  --alpha 0.5 --damp_head
 python exp_ogm_ge.py --target pfs --alpha 0.5
@@ -811,7 +808,7 @@ python experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py --t
 python experiments/실험4_영상_발언권독점_진단/exp_balance_dims.py --target pfs --variants img16
 
 # ⑦ 그래프 생성
-python tools/plot_all_figures.py --only fig7,fig8,fig9
+python tools/plot_all_figures.py --only fig7    # fig8·fig9 는 2026-09-30 삭제
 ```
 
 **산출물**
@@ -824,8 +821,6 @@ outputs/fusion_fix/results_{os,pfs}.json              # 시도 A·B 결과 + 학
 outputs/ogm_ge/results_{os,pfs}_a*.json               # 시도 C 결과 + gradient 감쇠 통계 (9.7.3)
 outputs/balance_dims/results_{os,pfs}.json            # 이미지 차원 축소 결과 + 발언권 (9.4.2)
 report_assets/fig7_os_vs_pfs_ladder.png               # 표 9-1 그래프
-report_assets/fig8_contribution_mismatch.png          # 표 9-3 그래프
-report_assets/fig9_same_image_different_outcome.png   # 9.4.1 그래프 (같은 이미지, 다른 결과)
 ```
 
 ---

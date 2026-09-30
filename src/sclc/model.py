@@ -13,7 +13,7 @@
   예전에는 같은 concat 융합 모델이 **세 벌** 따로 있었다.
     model.TrimodalConcatDeepSurv        : 3모달 고정
     ablation.AblatableConcatDeepSurv    : use_* 플래그로 브랜치 on/off
-    exp_fusion_fix.FixedConcatDeepSurv  : 위 + norm_mode(l2/none/scale)
+    exp_fusion_fix.FixedConcatDeepSurv  : 위 + norm_mode(l2/none/scale)  (스크립트는 2026-09-30 삭제)
   세 클래스의 브랜치 정의는 글자 단위로 같았고 forward 의 정규화 처리만 달랐다.
   ``ConcatDeepSurv`` 하나로 합치면서 **속성 이름(backbone/img_proj/
   clinical_branch/report_branch/head/branch_scale)을 그대로 유지**했으므로
