@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""TF-IDF 판독지 인코더 — **이 프로젝트가 최종 채택한 인코더**.
+"""TF-IDF 판독지 인코더 — 비교용 기준선 (2026-09 초까지의 채택 인코더).
+
+최종 채택 인코더는 RadBERT 다 (README.md "★ 최종 채택 모델"). 아래 설명은 TF-IDF 가
+한때 채택됐던 근거다.
 
 char n-gram(2~4) TF-IDF 400차원. 글자 조각의 빈도라서 의미를 모르고, 특히
 부정문("no evidence of metastasis")과 긍정문을 거의 구분하지 못한다. 그런데도
@@ -35,7 +38,7 @@ class TfidfReportEncoder(ReportEncoder):
     @property
     def description(self) -> str:
         return (f"char n-gram{self.ngram_range} TF-IDF {self.out_dim} "
-                "(프로젝트 채택 인코더 / 재현 기준선)")
+                "(비교용 / 재현 기준선)")
 
     def build_encoder_fn(self, corpus):
         # None = features 의 기본 TF-IDF 경로. 위 docstring 참고 — 재구현 금지.

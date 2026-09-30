@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """late fusion **학습** 드라이버 — 축을 각각 학습해 CoxPH 로 묶는다 (서브커맨드 3개).
 
-    method-b    2축 결합: [임상+판독지] + [영상]  ★프로젝트 최종 채택 모델(OS)
+    method-b    2축 결합: [임상+판독지] + [영상]  (채택 구조. 기본 인코더는 TF-IDF 라 OS 0.7143 —
+                최종 채택 수치(RadBERT, 0.7224)는 실험6 exp_encoder_trimodal.py 로 재현한다)
     three-way   3축 결합: 임상 · 판독지 · 영상을 각각 독립 학습한 뒤 가중합
     seed-sweep  method-b 레시피를 seed 만 바꿔 반복 (시드 강건성)
 
@@ -498,7 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
-    b = sub.add_parser("method-b", help="2축 late fusion (채택 모델)")
+    b = sub.add_parser("method-b", help="2축 late fusion (채택 구조; 기본 TF-IDF)")
     b.add_argument("--targets", type=comma_list, default=["os", "pfs"])
     b.add_argument("--seed", type=int, default=42)
     b.add_argument("--tab_epochs", type=int, default=60)

@@ -12,12 +12,47 @@ PET-CT 영상 · 임상변수 · 판독지 텍스트를 결합한 소세포폐�
 | [MODEL_SUMMARY.md](MODEL_SUMMARY.md) | 모달리티 조합별 최고 성능 모델 정리 |
 | [RESULTS_TABLE_final.md](RESULTS_TABLE_final.md) | 보고용 최종 성능 표 |
 
-## 최종 채택 모델
+## ★ 최종 채택 모델 (2026-09-30 확정 — 이 절이 기준이다)
 
-| 타깃 | 모델 | C-index |
+> **다른 문서와 이 절이 다르면 이 절이 맞다.** RESULTS.md · MODEL_SUMMARY.md ·
+> 실험6 보고서 등에 남은 "TF-IDF 채택", "OS 0.7143", "PFS는 영상 제외 0.6696" 같은
+> 표현은 **과거 결정의 기록**이다(아래 "이전 결정" 참고).
+
+**Late fusion 2-way** — OS·PFS 에 **같은 모델**을 쓴다.
+
+| 구성 요소 | 내용 |
+|---|---|
+| Tabular 축 | 임상 21변수 MLP(128×4) + 판독지 **RadBERT**(frozen, 한글 ko2en 치환, raw 768 → 32→16) 를 L2 정규화 후 concat → Cox head. bs32 / ep60 |
+| 영상 축 | 전신 PET-CT MIP 2D(512², 흑백) → **SimpleCNN**(4 블록, scratch) → Cox head. bs16 / ep30 |
+| 결합 | 두 OOF 위험점수를 fold 마다 CoxPH(2 공변량)로 결합. train 환자로만 적합 |
+| 평가 | 238명 · 5-fold CV(seed 42, OS·PFS 사건 층화) · test fold별 Harrell C-index 평균 ± SD |
+
+| 타깃 | C-index | 영상 계수 β_img (fold 평균; 검정 p 는 RESULTS.md TL;DR 10-R) |
 |---|---|---|
-| **OS** | late fusion (임상+판독지 concat + 영상 SimpleCNN) | **0.7143** |
-| **PFS** | 임상+판독지 concat (영상 제외 — 영상이 PFS엔 도움 안 됨) | **0.6696** |
+| **OS** | **0.7224 ± 0.033** | +0.29 (영상 기여 확립, p=0.004) |
+| **PFS** | **0.6470 ± 0.029** | +0.14 (방향 일관, 미확립 p=0.080 — tabular 단독 0.6456 과 사실상 같음) |
+
+- 재현: `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` (`--target pfs`)
+- 결과 파일: `outputs/radbert_full/results_{os,pfs}.json` 의 `late_tab_radbert+img`
+- 논문 그림: `report_assets/paper/` (Figure 1·2, 판독지 인코더 RadBERT 로 고정)
+
+**왜 이 구성인가 (근거 위치)**
+
+| 결정 | 근거 |
+|---|---|
+| 판독지 = RadBERT | 판독지 단독에서 TF-IDF 를 유의하게 앞섬(Δ+0.034, p=0.027). OS 는 모든 융합 방식에서 RadBERT 가 앞섬 — RESULTS_TABLE_final.md 표2·표3 |
+| 영상 = SimpleCNN | 단독 OS 0.657 로 ImageNet ResNet18(0.633)·RadImageNet ResNet50(0.616)보다 높음 — RESULTS.md §8, `outputs/image_radimagenet/results.json`(실험11 `exp_radimagenet.py`) |
+| 융합 = late 2-way | 같은 조건에서 early concat(0.6879)·late 3-way(0.7045)보다 OS 가 높음 — 표3-1 (실험12) |
+| 묶음 = [임상+판독지] + 영상 | 다른 묶음 [임상+영상]+판독지(0.6894), [판독지+영상]+임상(0.6733)보다 OS 가 높음, G2 대비 5/5 fold(p=0.010) — 표3-2 (실험13) |
+| PFS 도 같은 모델 | 저자 결정. PFS 에서는 세 융합 구조·세 묶음이 서로 구분되지 않는다(표3-1·3-2) |
+
+**민감도 분석:** 임상 결측을 train fold 중앙값으로만 대치해도 OS 0.7145 / PFS 0.6457 로
+유의한 차이 없음 — [실험15](experiments/실험15_결측대치_foldsafe_최종모델/README.md).
+채택 모델 자체는 분할 전 전체 중앙값 대치(기존 CSV) 그대로다.
+
+**이전 결정 (이력):** 2026-09 초까지는 판독지 TF-IDF 를 채택해 OS = late fusion 0.7143,
+PFS = 영상 뺀 임상+판독지 0.6696 이었다. 논문 headline 을 RadBERT 로 정하면서
+위 구성으로 바뀌었다. TF-IDF 결과와 그 근거는 삭제하지 않고 비교용으로 남겨 두었다.
 
 ## 코호트
 
@@ -32,8 +67,10 @@ PET-CT 영상 · 임상변수 · 판독지 텍스트를 결합한 소세포폐�
 
 - **Image**: `SimpleCNNBackbone` (4× ConvBlock, 512D) → Linear(512,128)+ReLU+Dropout(0.2) → L2 정규화
 - **Clinical**: 21개 변수(연속 8 표준화 + 범주 13) → [Linear-BN-ReLU-Dropout(0.5)] ×4 @128 → L2 정규화
-- **Report**: char n-gram(2,4) TF-IDF (max_features=400, fold별 fit) →
-  [Linear-BN-ReLU-Dropout(0.3)] ×(32,16) → L2 정규화
+- **Report**: frozen RadBERT 768차원(채택) 또는 char n-gram(2,4) TF-IDF 400차원(비교용·코드 기본값) →
+  [Linear-BN-ReLU-Dropout(0.3)] ×(32,16) → L2 정규화.
+  ⚠️ `TrimodalEvaluator` 는 `text_encoder_fn` 을 안 주면 **TF-IDF 로 돈다** — 채택 모델을
+  재현하려면 `sclc.encoders.build_encoder("radbert")` 를 넘겨야 한다.
 
 ### Early(concat) fusion — `sclc.model.ConcatDeepSurv`, `sclc.train.TrimodalEvaluator` 로 실행
 
@@ -64,7 +101,11 @@ python main.py --experiment late_fusion  --mode smoke_test
 python main.py --experiment late_fusion  --mode batch_smoke   # 결합 단계는 건너뜀 (main.py docstring 참고)
 python main.py --experiment late_fusion  --mode train
 
-# 최종 채택 모델 (late fusion method B)
+# ★ 최종 채택 모델 (RadBERT tabular + SimpleCNN, late fusion 2-way)
+python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os
+python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target pfs
+
+# (이력) TF-IDF 판 late fusion — OS 0.7143 / PFS 0.6621
 python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs
 
 # 그림

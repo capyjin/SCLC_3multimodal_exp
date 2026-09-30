@@ -726,7 +726,8 @@ def plot_fig1_mean_cindex():
 # 이 두 그림만 RESULTS.md 가 아니라 RESULTS_TABLE_final.md 표 6 에서 참조한다.
 # 수치는 전부 결과 JSON 에서 읽는다(손으로 옮겨 적으면 재실행 때 조용히 어긋난다).
 MOE_NOISE_BAND = 0.015          # 이 문서의 판정선 (fold별 차이의 표준오차 0.008~0.014)
-# 판독지 인코더는 타깃마다 채택이 다르다(표 3): OS 는 RadBERT 가 전 방식에서 우세해
+# ⚠️ 아래는 MoE 실험 당시의 기준이다. 최종 채택 모델은 두 타깃 모두 RadBERT (README.md).
+# 당시 판독지 인코더는 타깃마다 채택이 달랐다(표 3): OS 는 RadBERT 가 전 방식에서 우세해
 # 채택, PFS 는 concat/late 둘 다 RadBERT 가 오히려 나빠 TF-IDF 를 유지 채택했다
 # (예: concat 임상+판독지 PFS 는 TF-IDF 0.6696 vs RadBERT 0.6456). 그래서 게이트
 # 성능도 이 표 6 그림에서는 **타깃별 채택 인코더**로 봐야 late fusion(표 1)과
@@ -833,7 +834,7 @@ def plot_fig13_moe_m0_architecture():
 def plot_fig14_moe_m0_performance():
     """게이트 2종 vs 고정 비율 — 판정선(±0.015) 안에 들어가는지가 핵심.
 
-    타깃마다 채택된 판독지 인코더로 읽는다(표 3): OS=RadBERT, PFS=TF-IDF.
+    MoE 실험 당시 타깃별 인코더로 읽는다(표 3): OS=RadBERT, PFS=TF-IDF.
     두 타깃을 같은 인코더로 맞추면 PFS 기준선이 채택되지 않은 조합이 된다.
     """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.9))

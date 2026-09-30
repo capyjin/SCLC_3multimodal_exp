@@ -1,5 +1,10 @@
 # 모달리티 조합별 최고 성능 모델 정리
 
+> **★ 최종 채택 모델 (2026-09-30 확정): late fusion 2-way = [임상 + 판독지 RadBERT] + 영상 SimpleCNN,
+> OS·PFS 같은 모델 — OS 0.7224 ± 0.033 / PFS 0.6470 ± 0.029.** 기준 문서는
+> [README.md "★ 최종 채택 모델"](README.md) 이다. 이 문서는 **조합별 최고값** 정리이고,
+> 아래에서 "TF-IDF 채택"이라 적힌 곳은 2026-09 초까지의 **이전 결정**이다.
+
 **공통 조건**: 238명, 5-fold CV(seed 42), Cox 부분우도, Harrell C-index, epochs 60/30,
 batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 ※ 표에 "수정 전 참고값"이라 적힌 칸은 예외 — brain_meta 수정 후로 다시 돌리지 않은 것이며,
@@ -17,10 +22,14 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | 2-모달 | clinical+판독지 | concat(TF-IDF) | 0.7057 | **0.6696** |
 | 2-모달 | clinical+영상 | concat | (빈칸 — 수정 후 미측정) | (빈칸) |
 | 2-모달 | 영상+판독지 | — | (빈칸 — 실험 자체가 없음) | (빈칸) |
-| 3-모달 | clinical+판독지+영상 | late fusion 2-way(TF-IDF) | **0.7143** | **0.6621** |
-| 3-모달 | clinical+판독지+영상 | late fusion 3-way(각각 독립) | 0.6811 | 0.6313 |
+| 3-모달 | clinical+판독지+영상 | **late fusion 2-way(RadBERT) ★채택** | **0.7224** | 0.6470 |
+| 3-모달 | clinical+판독지+영상 | late fusion 2-way(TF-IDF) — 이력 | 0.7143 | **0.6621** |
+| 3-모달 | clinical+판독지+영상 | late fusion 3-way(각각 독립, TF-IDF) | 0.6811 | 0.6313 |
 
-**굵은 글씨 = 그 줄의 최고값.** 3-모달 late fusion(OS 0.7143)이 현재 이 프로젝트의 최종 채택 모델(OS 기준)이고, PFS는 2-모달 clinical+판독지(0.6696)가 최종 채택 모델이다(영상이 PFS엔 도움 안 됨).
+**굵은 글씨 = 그 줄의 최고값.** **최종 채택은 late fusion 2-way(RadBERT)이고 OS·PFS 에 같은 모델을 쓴다
+(0.7224 / 0.6470).** PFS 만 보면 TF-IDF 판(0.6621)이나 영상 뺀 clinical+판독지 TF-IDF(0.6696)가 더 높지만,
+논문은 판독지 인코더를 RadBERT 하나로 통일하고 두 타깃에 같은 구조를 쓰기로 했다.
+(이전 결정: OS = late fusion TF-IDF 0.7143, PFS = clinical+판독지 TF-IDF 0.6696.)
 
 ---
 
@@ -46,7 +55,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["report_only"]`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_compare.py` |
 | **실행 명령** | `python experiments/실험3_모달리티_절제실험/ablation.py --target os --configs report_only` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_compare.py --target os --encoders radbert --model_config report_only` |
 
-⚠️ **다만 최종 채택된 판독지 인코더는 TF-IDF다.** 단독으로는 RadBERT가 이기지만, clinical과 합치면(§2-1) 그 우위가 사라진다 — 자세한 이유는 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §2 참고.
+**최종 채택된 판독지 인코더는 RadBERT다**(2026-09-30). 단독으로는 RadBERT가 확실히 이기고, clinical과 합치면(§2-1) OS 우위는 줄고 PFS는 뒤집힌다 — 자세한 분석은 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §2. (이전 결정은 TF-IDF 채택이었다.)
 
 ### 1-3. 영상 단독 — **DeepSurv(SimpleCNN)가 최고**
 
@@ -62,9 +71,9 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 
 ## 2. 2-모달(bi-modal)
 
-### 2-1. clinical + 판독지 — **완성된 조합, 최종 채택**
+### 2-1. clinical + 판독지 — **최종 모델의 tabular 축**
 
-| | **TF-IDF (채택, 최고)** | RadBERT |
+| | TF-IDF (이력) | **RadBERT (채택)** |
 |---|---|---|
 | **성능 OS** | 0.7057 ± 0.048 | **0.7153** ± 0.033 |
 | **성능 PFS** | **0.6696 ± 0.041** | 0.6456 ± 0.019 |
@@ -72,7 +81,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["clin_report"]`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_fusion.py`, `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험3_모달리티_절제실험/ablation.py --target os --configs clin_report` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` |
 
-**왜 OS에서 더 높은 RadBERT를 안 쓰고 TF-IDF를 채택했나** — PFS에서 TF-IDF(0.6696)가 RadBERT(0.6456)를 크게 앞서고, 두 타깃을 같이 보면 TF-IDF가 낫다고 판단했다. 상세 근거는 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §4 참고.
+**인코더 결정의 변화** — 처음에는 PFS에서 TF-IDF(0.6696)가 RadBERT(0.6456)를 크게 앞서 두 타깃 동등 가중으로 TF-IDF를 채택했다(`REPORT_ENCODER_FINAL.md` §4). 이후 OS를 주 지표로 두고 논문 headline(OS 0.7224)을 RadBERT로 정하면서 **RadBERT로 바뀌었다** — §4.6이 "OS 우선이면 RadBERT가 방어 가능"이라고 미리 적어 둔 분기다. PFS에서 RadBERT가 불리하다는 사실은 그대로이므로 논문에 한계로 적는다.
 
 ### 2-2. clinical + 영상 — **빈칸 (재측정 필요)**
 
@@ -106,19 +115,19 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 | **코드 파일** | `experiments/실험3_모달리티_절제실험/ablation.py` (`CONFIGS["all"]`) — RadBERT 재측정은 `experiments/실험12_융합방식_조건통일/exp_fusion_methods.py` |
 | **비고** | 이 방식은 영상이 최종 위험점수의 70~80%를 독점해서 성능이 오히려 깎이는 문제가 있었다(`RESULTS.md` §9). 그래서 아래 late fusion으로 대체됐고, 최종 후보에서 제외됐다 |
 
-### 3-2. late fusion 2-way (tabular=clinical+판독지 하나로 학습 + 영상) — **최종 채택 모델 (OS 기준)**
+### 3-2. late fusion 2-way (tabular=clinical+판독지 하나로 학습 + 영상) — **★최종 채택 모델 (OS·PFS 공통)**
 
-| | **TF-IDF (채택, 최고)** | RadBERT |
+| | TF-IDF (이력) | **RadBERT (채택)** |
 |---|---|---|
-| **성능 OS** | **0.7143 ± 0.051** | 0.7224 ± 0.033 |
-| **성능 PFS** | **0.6621 ± 0.040** | 0.6470 ± 0.029 |
+| **성능 OS** | 0.7143 ± 0.051 | **0.7224 ± 0.033** |
+| **성능 PFS** | 0.6621 ± 0.040 | **0.6470 ± 0.029** |
 | **모델 구조** | ① clinical+판독지를 §2-1 구조로 **함께** 학습해 위험점수 1개를 뽑고 ② 영상(SimpleCNN)을 §1-3 구조로 따로 학습해 위험점수 1개를 뽑은 뒤 ③ 두 위험점수를 fold별로 CoxPH(lifelines)에 넣어 가중합 계수를 적합 |
 | **코드 파일** | `experiments/실험1_기본융합_early_late/exp_late_fusion.py` (`method-b`; `sclc.late_fusion.combine_two`) | `experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py` |
 | **실행 명령** | `python experiments/실험1_기본융합_early_late/exp_late_fusion.py method-b --targets os,pfs` | `python experiments/실험6_판독지_인코더_비교/exp_encoder_trimodal.py --target os` 그리고 `--target pfs` |
 
 **왜 하필 임상과 판독지를 묶었나** — 2-way 는 세 모달리티를 다 쓰되 그중 둘만 묶어 학습하므로 묶는 조합이 셋(임상+판독지 / 임상+영상 / 판독지+영상)이다. 실험13이 셋을 같은 조건에서 재 봤고, 채택한 조합이 OS 에서 나머지 둘을 앞선다(0.7224 vs 0.6894/0.6733, G2 대비 5 fold 전부 우세 p=0.010). PFS 에서는 셋이 구분되지 않는다. 표와 해석은 `RESULTS_TABLE_final.md` 표3-2.
 
-**RadBERT 버전이 OS에서 더 높은데(0.7224) 왜 TF-IDF를 채택했나** — 2-1과 같은 이유. PFS에서 TF-IDF가 크게 앞선다(0.6621 vs 0.6470). 두 타깃 동등 가중이면 TF-IDF, OS만 우선한다면 RadBERT가 방어 가능 — 이 판단 기준은 `experiments/실험6_판독지_인코더_비교/REPORT_ENCODER_FINAL.md` §4.6에 정리돼 있다.
+**왜 RadBERT 판을 채택했나** — 2-1과 같다. OS에서 RadBERT 판이 높고(0.7224 vs 0.7143) fold 편차도 작다(0.033 vs 0.051). PFS에서는 TF-IDF 판이 높지만(0.6621 vs 0.6470) 논문은 OS를 주 지표로 두고 인코더를 하나로 통일했다 — 판단 기준은 `REPORT_ENCODER_FINAL.md` §4.6.
 
 ### 3-3. late fusion 3-way (clinical·판독지·영상 각각 독립 학습 후 결합)
 
@@ -133,7 +142,7 @@ batch 32/16. 전부 `brain_meta` 누수 수정 후(2026-08-02 이후) 수치다.
 
 **TF-IDF 조건에서는 3-way가 2-way보다 뚜렷이 낮다(OS −0.033, PFS −0.031, 표3-2 대비).** clinical과 판독지를 **각각 따로** 학습시키면 둘 다 약한데(OS 0.63대/0.62대), **하나로 묶어서 같이** 학습시키면 0.71까지 오른다 — §2-1에서 확인한 "clinical과 판독지는 함께 학습해야 서로 보완 효과가 난다"는 결과와 정확히 같은 현상이다. 판독지가 부족한 부분을 임상변수가 메워주는 상호작용은 **모델을 합쳐야만** 학습되고, 점수만 사후 결합하는 late fusion(3-way)은 이 상호작용을 못 잡는다.
 
-**RadBERT로 통일하면 격차가 좁혀지거나(OS) 역전된다(PFS).** OS는 2-way(0.7224)가 여전히 위지만 격차가 −0.033→−0.018로 줄고, **PFS는 3-way(0.6545)가 2-way·RadBERT(0.6470)를 앞선다.** 새로운 모순이 아니다 — 표3에서 이미 "RadBERT는 다른 모달리티와 결합될 때 PFS 신호를 깎는다"(concat Δ−0.024, late+영상 Δ−0.015)가 확인돼 있고, 3-way는 각 축을 **따로** 학습해 그 결합 손실을 3-way의 두 축(clinical+report)에서는 겪지 않는다. 그래도 이 프로젝트가 PFS에 **TF-IDF 2-way(0.6621)**를 채택하는 이유는 바뀌지 않는다 — RadBERT·3-way(0.6545)보다 TF-IDF·2-way가 여전히 높다. 자세한 조건 통일 실험은 `RESULTS_TABLE_final.md` 표3-1 참고.
+**RadBERT로 통일하면 격차가 좁혀지거나(OS) 역전된다(PFS).** OS는 2-way(0.7224)가 여전히 위지만 격차가 −0.033→−0.018로 줄고, **PFS는 3-way(0.6545)가 2-way·RadBERT(0.6470)를 앞선다.** 새로운 모순이 아니다 — 표3에서 이미 "RadBERT는 다른 모달리티와 결합될 때 PFS 신호를 깎는다"(concat Δ−0.024, late+영상 Δ−0.015)가 확인돼 있고, 3-way는 각 축을 **따로** 학습해 그 결합 손실을 3-way의 두 축(clinical+report)에서는 겪지 않는다. 채택 모델(RadBERT 2-way)의 PFS 0.6470 은 3-way(0.6545)·early concat(0.6555)과 fold 편차 안에서 구분되지 않는다 — PFS 에서는 융합 구조가 성능을 가르지 않는다. 자세한 조건 통일 실험은 `RESULTS_TABLE_final.md` 표3-1 참고.
 
 ---
 

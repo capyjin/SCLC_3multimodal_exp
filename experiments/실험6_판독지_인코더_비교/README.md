@@ -12,8 +12,11 @@
 
 | 인코더 | 성격 | 상태 |
 |---|---|---|
-| `tfidf` | char n-gram(2~4) TF-IDF 400차원 | ✅ **최종 채택** |
-| `radbert` | frozen `StanfordAIMI/RadBERT` 768차원 (한글 ko2en 치환) | 단독 최고, 결합 시 무승부 |
+| `radbert` | frozen `StanfordAIMI/RadBERT` 768차원 (한글 ko2en 치환) | ✅ **최종 채택** (2026-09-30) — 단독 최고, 결합 시 OS 우세·PFS 열세 |
+| `tfidf` | char n-gram(2~4) TF-IDF 400차원 | 비교용 (이전 채택) · 코드 기본 경로 |
+
+**최종 채택 모델 재현:** `python exp_encoder_trimodal.py --target os` / `--target pfs`
+→ `outputs/radbert_full/results_{os,pfs}.json` 의 `late_tab_radbert+img` (OS 0.7224 / PFS 0.6470).
 
 정의는 [`src/sclc/encoders/`](../../src/sclc/encoders/) 한 곳에만 있다
 (`ReportEncoder` 추상 부모 + 구현 2개). 실험 스크립트는 인코더를 직접 만들지 않고

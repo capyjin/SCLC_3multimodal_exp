@@ -1,5 +1,11 @@
 # Methods — Data processing (draft)
 
+> **⚠️ 상태 (2026-09-30):** 초안이다. 최종 모델은 README.md "★ 최종 채택 모델"(RadBERT 2-way,
+> OS·PFS 공통)을 따른다. **알려진 오류 1건:** Study population 의 제외 사유 (3) "dated after the
+> documented disease progression (n = 8)" 는 부정확하다 — 8명 중 4명은 판독일이 진행일보다 앞서며,
+> 제외 근거는 날짜가 아니라 판독지 내용(치료반응·재발평가 문구)이었다. "the available report
+> described treatment response or recurrence rather than initial staging" 으로 고쳐야 한다.
+
 > Items in **[brackets]** are facts that are not recorded in this repository and must be
 > filled in by the authors. Every number outside brackets was recomputed from the code and
 > data on 2026-09-30 (sources are listed in the notes at the end of this file).
@@ -159,6 +165,6 @@ GeForce RTX 4070 Ti SUPER GPU. **[Code availability statement.]**
 1. **전체 코호트 중앙값 대치.** 본문에서는 누수 가능성을 먼저 인정하고 민감도분석으로 방어하게 썼다. 이 중앙값이 321명 기준인지 238명 기준인지는 확인하지 못했다(`data/Clinical/fillna_tabular_data_260619.csv` 생성 경위).
 2. **범주형 정수코딩.** smoking_status, lung_disease, rt_type처럼 순서가 없는 변수도 one-hot 없이 정수로 들어간다. 본문에는 사실대로만 적었다.
 3. **치료 변수.** atezolizumab 사용과 흉부 RT 유형은 기저 이후에 결정되는 변수라, 뇌전이와 같은 논리로 지적받을 수 있다. 최소한 Discussion 한계에 적는 것을 권한다.
-4. **판독지 인코더 표기.** 이 원고는 논문 headline에 맞춰 RadBERT로 썼다. MODEL_SUMMARY.md의 채택 모델은 TF-IDF이므로 결과 표와 표기를 맞춰야 한다.
+4. **판독지 인코더 표기.** ~~MODEL_SUMMARY.md의 채택 모델은 TF-IDF이므로 맞춰야 한다~~ → **해결(2026-09-30):** 최종 채택이 RadBERT 로 확정돼 문서 전체를 RadBERT 기준으로 맞췄다.
 5. **57·280번 환자.** 본문에는 "report date unavailable"로 썼다. 실제로는 고정 split 생성 이후 적격이 된 환자이므로 사유를 확인해야 한다.
 6. **Results에 넣을 수치.** 추적관찰 중앙값은 역 KM으로 1,633일, OS 중앙값은 356일, PFS 중앙값은 183일이다.

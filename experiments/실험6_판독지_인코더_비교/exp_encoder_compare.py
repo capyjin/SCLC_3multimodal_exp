@@ -8,7 +8,7 @@
   인코더만** 바꿔서 이득이 있는지 본다.
 
 arm (= sclc.encoders 의 후보 전부):
-  tfidf          char n-gram TF-IDF 400 — 최종 채택 인코더 / 재현 기준선
+  tfidf          char n-gram TF-IDF 400 — 비교용 (이전 채택) / 재현 기준선  ※ 최종 채택은 radbert
   radbert        frozen RadBERT 768, 한글 ko2en 치환 (채택 레시피)
   radbert@strip  RadBERT + 한국어 삭제   ([UNK] 진단용 대조군, §5.2)
   radbert@raw    RadBERT + 원문 그대로   ([UNK] 진단용 대조군, §5.2)

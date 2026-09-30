@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """인코더 이름 -> 클래스. **후보는 이 표가 전부다.**
 
-  tfidf           char n-gram TF-IDF 400 — 최종 채택
-  radbert         frozen RadBERT 768 (한글 ko2en) — 단독 최고, 결합 시 무승부
+  radbert         frozen RadBERT 768 (한글 ko2en) — ★최종 채택 (2026-09-30, README 참고)
+  tfidf           char n-gram TF-IDF 400 — 비교용 (이전 채택)
   radbert@strip   RadBERT + 한국어 삭제        (§5.2 [UNK] 진단용 대조군)
   radbert@raw     RadBERT + 원문 그대로        (§5.2 [UNK] 진단용 대조군)
 

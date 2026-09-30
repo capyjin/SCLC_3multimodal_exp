@@ -71,7 +71,7 @@ seed 42/142/242는 **가중치 초기화와 배치 셔플만** 바꾼다. fold �
 | clin_only PFS | 0.6223 ± 0.0366 | 0.6223 |
 | clin_report PFS | 0.6696 ± 0.0406 | 0.6696 |
 
-추가로 late fusion `original/seed42`가 **OS 0.7143 / PFS 0.6621**로 나와 최종 채택 모델 수치까지 재현됐다.
+추가로 late fusion `original/seed42`가 **OS 0.7143 / PFS 0.6621**로 나와 당시(TF-IDF) 채택 모델 수치까지 재현됐다. (현재 최종 채택은 RadBERT 판 — README, 그 fold-safe 재검증은 실험15.)
 
 또한 새 실험 하네스(`exp_missing_handling.py`)의 `original` variant가 기존 `실험3_모달리티_절제실험/ablation.py` 경로와 fold별로 동일한 값을 냈다 — `src/sclc/train.py`에 추가한 `clinical_columns_fn` 훅이 기본 경로를 전혀 바꾸지 않았다는 증거다.
 
