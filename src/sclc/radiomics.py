@@ -141,6 +141,38 @@ def extract_one(image_path: str, research_id: int, inverted_ids) -> dict[str, fl
     return feats
 
 
+# ---------------------------------------------------------------------------
+# 교란(nuisance) 전역 통계 6개 -- 실험10 exp_trivial_stats.py 가 도입한 그 정의.
+# 세 번째 사용처(실험14 영상 교란보정 검정)가 생겨 여기로 승격했다. 정의를 바꾸면
+# outputs/image_permutation/trivial_stats.json 과 비교가 깨지므로 고정한다.
+#   w, h      원본 PNG 폭/높이 -- 크롭 범위(체격 - FOV) 대리
+#   mean,std  전역 밝기 - 대비
+#   frac_hot  밝은 화소 비율(>0.6). MIP 은 고섭취가 어둡게 찍히므로 사실상 배경 면적
+#   frac_dark 어두운 화소 비율(<0.1) -- 최고섭취 영역 면적 대리
+# ---------------------------------------------------------------------------
+TRIVIAL_NAMES = ("w", "h", "mean", "std", "frac_hot", "frac_dark")
+
+
+def extract_trivial_one(image_path: str, research_id: int, inverted_ids) -> dict[str, float]:
+    img = Image.open(image_path).convert("L")
+    if int(research_id) in inverted_ids:
+        img = ImageOps.invert(img)
+    w, h = img.size
+    a = np.asarray(img, dtype=np.float32) / 255.0
+    return {"w": float(w), "h": float(h), "mean": float(a.mean()), "std": float(a.std()),
+            "frac_hot": float((a > 0.6).mean()), "frac_dark": float((a < 0.1).mean())}
+
+
+def extract_trivial_stats(image_dir: str, research_ids, inverted_ids=frozenset()) -> "pd.DataFrame":
+    """환자별 전역 통계 6개. 라벨 미사용이라 fold 밖에서 한 번만 호출한다."""
+    import pandas as pd
+
+    rows = {int(rid): extract_trivial_one(os.path.join(image_dir, f"{int(rid)}.png"),
+                                          int(rid), inverted_ids)
+            for rid in research_ids}
+    return pd.DataFrame.from_dict(rows, orient="index")[list(TRIVIAL_NAMES)]
+
+
 def extract_features(image_dir: str, research_ids, inverted_ids=frozenset()) -> "pd.DataFrame":
     """환자별 radiomics 특징표. 라벨 미사용이므로 fold 밖에서 한 번만 호출한다."""
     import pandas as pd
