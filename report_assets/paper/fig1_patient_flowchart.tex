@@ -2,6 +2,8 @@
 % 수치 출처(하드코딩 전 재계산 확인, 2026-09-30):
 %   321 / 64 / 257            src/sclc/cohort.py::build_manifest()  (has_image, exclusion_reason)
 %   9 / 8 / 2 -> 238          no_report / EVIDENCE_CONFIRMED_LEAK_IDS / report_date 결측(57, 280)
+%                             8명의 제외 근거는 날짜가 아니라 판독지 내용(치료반응·재발평가 문구)이다.
+%                             4명은 판독일이 진행일보다 앞서므로 "dated after progression" 이라 쓰면 틀린다.
 %   LS 72, ES 166, 사건 수      load_trimodal_cohort()  (stage, os_event, pfs_event)
 %   진단일 2014-01 ~ 2025-01   data/20260619 SCLC PET 전달용.xlsx '진단일' (238명 기준)
 %   fold 크기                   data/splits/trimodal_common_5fold_seed42_v1.csv
@@ -34,7 +36,7 @@
 \node[excl] (ex2) at (3.9,-4.25)
   {\textbf{Excluded (n = 19)}\\
    No usable radiology report (n = 9)\\
-   Report dated after disease progression (n = 8)\\
+   Report of a response or recurrence study (n = 8)\\
    Report date unavailable (n = 2)};
 
 \node[flow, line width=1.1pt] (final) at (0,-5.95)

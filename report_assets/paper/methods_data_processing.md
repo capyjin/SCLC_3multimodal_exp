@@ -1,10 +1,8 @@
 # Methods — Data processing (draft)
 
 > **⚠️ 상태 (2026-09-30):** 초안이다. 최종 모델은 README.md "★ 최종 채택 모델"(RadBERT 2-way,
-> OS·PFS 공통)을 따른다. **알려진 오류 1건:** Study population 의 제외 사유 (3) "dated after the
-> documented disease progression (n = 8)" 는 부정확하다 — 8명 중 4명은 판독일이 진행일보다 앞서며,
-> 제외 근거는 날짜가 아니라 판독지 내용(치료반응·재발평가 문구)이었다. "the available report
-> described treatment response or recurrence rather than initial staging" 으로 고쳐야 한다.
+> OS·PFS 공통)을 따른다. 제외 사유 (3)의 8명은 날짜가 아니라 판독지 내용(치료반응·재발평가
+> 문구)으로 제외됐다(4명은 판독일이 진행일보다 앞선다) — 본문과 Fig. 1 흐름도를 이에 맞춰 고쳤다.
 
 > Items in **[brackets]** are facts that are not recorded in this repository and must be
 > filled in by the authors. Every number outside brackets was recomputed from the code and
@@ -25,9 +23,9 @@ examination; (2) the radiology report of that examination; and (3) complete over
 (OS) and progression-free survival (PFS) information. Patients were excluded for the
 following reasons: (1) no PET-CT image was available (n = 64); (2) no usable radiology
 report was available (n = 9); and (3) the report could not be confirmed as a baseline
-document, because it was dated after the documented disease progression (n = 8) or its date
-was unavailable (n = 2). Reports dated after progression were excluded because they may
-contain post-baseline information about the outcome. Finally, 238 patients diagnosed between
+document, because the available report described treatment response or recurrence rather
+than initial staging (n = 8) or its date was unavailable (n = 2). Such reports were excluded
+because they may contain post-baseline information about the outcome. Finally, 238 patients diagnosed between
 January 2014 and January 2025 were included (Fig. 1). Disease stage was classified as
 limited-stage (LS; n = 72, 30.3%) or extensive-stage (ES; n = 166, 69.7%) according to the
 **[Veterans Administration Lung Study Group]** system.
