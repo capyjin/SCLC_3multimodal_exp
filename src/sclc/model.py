@@ -1,26 +1,12 @@
 # -*- coding: utf-8 -*-
-"""이미지 백본 · 모달리티 브랜치 · 융합 모델.
+"""영상 백본(SimpleCNN 등), 임상/판독지 브랜치, 융합 모델 정의.
 
-- ``SimpleCNNBackbone``/``ConvBlock`` 은 ``clinical+image/model.py`` 에서 그대로
-  가져온 것이다 (융합 지시상 이미지 인코더 구조는 변경 금지).
-- ``_MLPBranch`` 는 ``clinical+report`` 의 early fusion 브랜치 형태
-  (Linear -> BatchNorm -> ReLU -> Dropout 반복) 이며 earlyfusion.md 가 검증한
-  구조다 (OS C-index 0.7083).
-- ``generate_net``/``get_cox_ph_model`` 은 두 원본 프로젝트 공통 코드로,
-  late fusion 의 clinical-only/report-only arm (pycox CoxPH + torchtuples) 이 쓴다.
-
-[통합 이력 — ConcatDeepSurv]
-  예전에는 같은 concat 융합 모델이 **세 벌** 따로 있었다.
-    model.TrimodalConcatDeepSurv        : 3모달 고정
-    ablation.AblatableConcatDeepSurv    : use_* 플래그로 브랜치 on/off
-    exp_fusion_fix.FixedConcatDeepSurv  : 위 + norm_mode(l2/none/scale)  (스크립트는 2026-09-30 삭제)
-  세 클래스의 브랜치 정의는 글자 단위로 같았고 forward 의 정규화 처리만 달랐다.
-  ``ConcatDeepSurv`` 하나로 합치면서 **속성 이름(backbone/img_proj/
-  clinical_branch/report_branch/head/branch_scale)을 그대로 유지**했으므로
-  기존 체크포인트(.pt)의 state_dict 키가 전부 그대로 로드된다.
-    - 기본값(use_* 전부 True, norm_mode="l2") = 옛 TrimodalConcatDeepSurv
-    - use_* 만 지정        = 옛 AblatableConcatDeepSurv
-    - norm_mode 까지 지정  = 옛 FixedConcatDeepSurv
+- SimpleCNNBackbone: 영상 인코더 (구조 변경 금지)
+- _MLPBranch: 임상/판독지용 MLP 브랜치
+- ConcatDeepSurv: 영상·임상·판독지를 이어붙여 Cox head 로 보내는 early fusion 모델
+  (use_* 플래그로 모달리티 on/off 가능)
+- ImageOnlyDeepSurv: 영상 단독 모델 (late fusion 의 영상 arm)
+- generate_net / get_cox_ph_model: late fusion 의 임상·판독지 arm 용 (pycox CoxPH)
 """
 import torch
 import torch.nn as nn
@@ -40,7 +26,7 @@ def get_cox_ph_model(net, optimizer, lr):
 
 
 # ---------------------------------------------------------------------------
-# 이미지 백본 -- clinical+image/model.py 에서 그대로 가져옴
+# 영상 백본
 # ---------------------------------------------------------------------------
 
 class ConvBlock(nn.Module):
@@ -58,7 +44,7 @@ class ConvBlock(nn.Module):
 
 
 class SimpleCNNBackbone(nn.Module):
-    """4-블록 CNN -> 512차원 특징 (clinical+image 원본과 동일)."""
+    """ConvBlock 4개(채널 32→64→128→256) → 평균풀링 → Linear → 512차원 특징."""
 
     def __init__(self, in_channels: int = 1, output_dim: int = 512):
         super().__init__()
@@ -79,11 +65,11 @@ class SimpleCNNBackbone(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# 임상/판독지 브랜치 -- clinical+report/earlyfusion.md 가 검증한 형태
+# 임상/판독지 브랜치
 # ---------------------------------------------------------------------------
 
 class _MLPBranch(nn.Module):
-    """[Linear -> BatchNorm1d -> ReLU -> Dropout] 를 hidden 폭마다 반복."""
+    """[Linear → BatchNorm → ReLU → Dropout] 을 hidden 크기 목록만큼 반복."""
 
     def __init__(self, in_dim: int, hidden_dims: tuple[int, ...], dropout: float):
         super().__init__()
@@ -100,33 +86,29 @@ class _MLPBranch(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Early(concat) fusion -- 세 브랜치를 이어붙여 Cox head 하나로
+# Early fusion -- 브랜치 출력을 이어붙여 Cox head 하나로
 # ---------------------------------------------------------------------------
 
 NORM_MODES = ("l2", "none", "scale")
 
 
 class ConcatDeepSurv(nn.Module):
-    """image / clinical / report 를 concat 하는 DeepSurv 모델.
+    """영상 / 임상 / 판독지 브랜치를 이어붙여(concat) 위험점수 1개를 내는 DeepSurv.
 
-    forward 는 ``(image, tabular)`` 를 받는다. ``tabular`` 는
-    ``features.build_fold_multimodal_tabular`` 가 만든 [clinical | text] 결합
-    벡터 하나이며, ``clinical_dim`` 으로 다시 두 브랜치로 잘라 쓴다. 덕분에
-    이미지+tabular 용 ``PetSurvivalDataset`` 배관을 고치지 않고 그대로 쓴다.
+    입력: forward(image, tabular)
+      tabular = [임상 | 판독지] 가 붙은 벡터. clinical_dim 기준으로 다시 나눠 쓴다.
 
-    브랜치 형태(고정):
-      image    : SimpleCNNBackbone(512) -> Linear(512,image_proj_dim)+ReLU+Dropout(0.2)
-      clinical : [Linear-BN-ReLU-Dropout(0.5)] x4 @128
-      report   : [Linear-BN-ReLU-Dropout(0.3)] x(32,16)
-      head     : concat -> Dropout(0.3) -> Linear(fused,1,bias=False)
+    구조:
+      영상   : SimpleCNN(512) → Linear(512→image_proj_dim) → ReLU → Dropout(0.2)
+      임상   : [Linear-BN-ReLU-Dropout(0.5)] × 4, 폭 128
+      판독지 : [Linear-BN-ReLU-Dropout(0.3)] 폭 32, 16
+      head   : concat → Dropout(0.3) → Linear(→1)
 
-    ``use_*`` 로 브랜치를 켜고 끈다 (절제 실험). 최소 하나는 켜져 있어야 한다.
-
-    ``norm_mode`` 는 브랜치 출력을 이어붙이기 **직전**의 크기 조절 방식이다.
-      "l2"    기본. 모든 브랜치를 길이 1로 맞춘다.
-      "none"  아무것도 안 함 (브랜치가 스스로 출력 크기를 조절 가능).
-      "scale" 길이 1로 맞춘 뒤 브랜치마다 학습되는 스칼라(``branch_scale``)를 곱한다.
-              -> "이 모달리티는 작게 듣자"를 모델이 배울 수 있는지 보는 장치.
+    use_*   : 모달리티 on/off (최소 1개 필요)
+    norm_mode : concat 직전 브랜치 출력 크기 조절 방식
+      "l2"    각 브랜치 길이를 1로 맞춤 (기본)
+      "none"  조절 안 함
+      "scale" 길이를 1로 맞춘 뒤 브랜치별 학습 가능한 배율(branch_scale)을 곱함
     """
 
     def __init__(
@@ -172,7 +154,7 @@ class ConcatDeepSurv(nn.Module):
             fused_dim += self.report_branch.out_dim
 
         if norm_mode == "scale":
-            # 브랜치당 1개, 1.0 에서 출발해 학습으로 조절된다.
+            # 브랜치당 배율 1개 (초기값 1.0)
             self.branch_scale = nn.Parameter(torch.ones(sum([use_image, use_clinical, use_report])))
 
         self.fusion_dropout = nn.Dropout(fusion_dropout)
@@ -185,8 +167,7 @@ class ConcatDeepSurv(nn.Module):
         return feat if self.norm_mode == "l2" else feat * self.branch_scale[idx]
 
     def branch_features(self, image: torch.Tensor, tabular: torch.Tensor) -> dict[str, torch.Tensor]:
-        """모달리티별 (크기 조절까지 끝난) 특징. 기여도 분석이 head 가중치와
-        곱해 쓸 수 있도록 forward 와 **같은 경로**로 계산해 돌려준다."""
+        """모달리티별 특징(크기 조절 후)을 dict 로 반환. forward 와 같은 경로라 기여도 분석에 쓴다."""
         expected = self.clinical_dim + self.report_dim
         if tabular.ndim != 2 or tabular.size(1) != expected:
             raise ValueError(f"Expected tabular shape [B, {expected}], got {tuple(tabular.shape)}")
@@ -207,9 +188,7 @@ class ConcatDeepSurv(nn.Module):
         return self.head(self.fusion_dropout(torch.cat(list(feats.values()), dim=1)))
 
 
-# ── 모달리티 조합표 ──────────────────────────────────────────────────────────
-# 절제(ablation) 실험뿐 아니라 "임상+판독지만 학습" 같은 조합을 쓰는 모든 실험이
-# 여기서 가져다 쓴다. 이름이 outputs/ 폴더명·문서 표기와 1:1로 대응한다.
+# 모달리티 조합표 (이름은 outputs/ 폴더명·문서 표기와 동일)
 MODALITY_CONFIGS = {
     "all":         dict(use_image=True,  use_clinical=True,  use_report=True),   # 3모달
     "clin_report": dict(use_image=False, use_clinical=True,  use_report=True),   # 임상+판독지
@@ -220,16 +199,16 @@ MODALITY_CONFIGS = {
     "image_only":  dict(use_image=True,  use_clinical=False, use_report=False),  # 영상만
 }
 
-# 각 모달리티 브랜치의 기본 출력 차원 (기여도/가중치 분해에서 head 를 블록으로 자를 때 쓴다)
+# 브랜치별 기본 출력 차원 (head 가중치를 모달리티별로 자를 때 사용)
 BRANCH_OUT_DIM = {"image": 128, "clinical": 128, "report": 16}
 
 
 def make_model_factory(flags: dict | None = None, **overrides):
-    """``TrimodalEvaluator(model_factory=...)`` 에 넘길 공장 함수를 만든다.
+    """TrimodalEvaluator 에 넘길 모델 생성 함수를 만든다.
 
-    ``flags`` 는 ``MODALITY_CONFIGS`` 의 한 항목(use_* 3개)이고, ``overrides`` 로
-    ``norm_mode``/``image_proj_dim``/``report_hidden`` 등 나머지 인자를 덮어쓴다.
-    Evaluator 가 fold 마다 clinical_dim/report_dim 을 알아낸 뒤 호출한다.
+    flags     : MODALITY_CONFIGS 의 한 항목 (use_* 3개)
+    overrides : norm_mode, image_proj_dim 등 나머지 인자
+    fold 마다 clinical_dim/report_dim 이 정해진 뒤 호출된다.
     """
     kwargs = {**(flags or MODALITY_CONFIGS["all"]), **overrides}
 
@@ -240,12 +219,11 @@ def make_model_factory(flags: dict | None = None, **overrides):
 
 
 # ---------------------------------------------------------------------------
-# 영상 단독 DeepSurv -- late fusion 의 이미지 arm (tabular 입력 없음)
+# 영상 단독 DeepSurv (late fusion 의 영상 arm)
 # ---------------------------------------------------------------------------
 
 class ImageOnlyDeepSurv(nn.Module):
-    """순수 영상 DeepSurv. clinical+image/model.py 의 tabular_dim=0 경로와 동일
-    (backbone -> Dropout -> Linear(512,1), 투영/L2정규화 없음)."""
+    """영상 단독 DeepSurv: SimpleCNN(512) → Dropout → Linear(512→1)."""
 
     def __init__(self, gray_scale: bool = True, dropout: float = 0.2):
         super().__init__()
@@ -257,10 +235,9 @@ class ImageOnlyDeepSurv(nn.Module):
 
 
 class ResNet18DeepSurv(nn.Module):
-    """ImageNet 사전학습 ResNet18 백본을 쓰는 영상 단독 DeepSurv (대조 백본).
+    """ImageNet 사전학습 ResNet18 기반 영상 단독 DeepSurv (비교용).
 
-    흑백 PET-CT 를 넣기 위해 conv1 을 1채널로 교체하고, 사전학습 RGB 필터의
-    **채널 평균**을 초기값으로 쓴다(무작위 초기화보다 사전학습 정보를 보존).
+    흑백 입력을 위해 conv1 을 1채널로 바꾸고, 사전학습 RGB 필터의 채널 평균으로 초기화한다.
     """
 
     def __init__(self, gray_scale: bool = True, pretrained: bool = True, dropout: float = 0.3):
@@ -288,15 +265,9 @@ class ResNet18DeepSurv(nn.Module):
 
 
 class _RadImageNetBackbone(nn.Module):
-    """1채널 회색조 -> 3채널 복제 -> RadImageNet ResNet50(notop) -> GAP -> 2048차원.
+    """흑백 1채널 → 3채널 복제 → RadImageNet ResNet50(분류 head 없음) → 평균풀링 → 2048차원.
 
-    ``torch.hub`` 로 받는 원본 포트(Warvito/radimagenet-models)는 Keras 구현을
-    그대로 옮긴 것이라 분류 head 가 없고(layer4 feature map 그대로 반환) conv1 이
-    3채널 고정이다. ResNet18DeepSurv 처럼 conv1 을 1채널로 바꿔 사전학습 필터를
-    채널평균으로 근사하는 대신, 여기서는 **conv1 을 원본 그대로 두고 입력을
-    3채널로 복제**한다 -- RadImageNet 원본 학습 데이터(CT/MRI/US)도 흑백을 3채널
-    복제해 넣은 것으로 알려져 있어, 필터를 건드리지 않는 쪽이 사전학습 정보를
-    더 그대로 보존한다.
+    conv1 은 원본(3채널) 그대로 두고 입력 쪽을 3채널로 복제한다.
     """
 
     output_dim = 2048
@@ -308,8 +279,7 @@ class _RadImageNetBackbone(nn.Module):
                 "Warvito/radimagenet-models", "radimagenet_resnet50", trust_repo=True,
             )
         else:
-            # 구조만 같고 학습은 안 한 대조군(실험8/10과 동일한 논리) -- 포트의
-            # ResNet50 클래스를 가중치 로드 없이 그대로 재사용한다.
+            # 대조군: 같은 구조, 사전학습 가중치 없음 (실험8/10과 동일한 논리)
             module = torch.hub.load(
                 "Warvito/radimagenet-models", "radimagenet_resnet50", trust_repo=True,
             ).__class__
@@ -324,13 +294,10 @@ class _RadImageNetBackbone(nn.Module):
 
 
 class RadImageNetDeepSurv(nn.Module):
-    """RadImageNet(CT/MRI/초음파 130만 장, 실제 임상 방사선영상) 사전학습
-    ResNet50 백본을 쓰는 영상 단독 DeepSurv (대조 백본).
+    """RadImageNet(방사선영상 사전학습) ResNet50 기반 영상 단독 DeepSurv (비교용).
 
-    ResNet18DeepSurv(ImageNet, 자연영상)가 도메인 미스매치로 SimpleCNN 에 못
-    미쳤던 것과 대비되는 실험 -- 방사선영상 통계로 사전학습됐다는 점만 다르고
-    나머지(구조를 backbone/head 로 노출, Dropout+Linear(dim,1) head)는 동일한
-    패턴을 따른다.
+    ResNet18DeepSurv(ImageNet 자연영상)와 달리 의료영상으로 사전학습된 백본이다.
+    head 는 Dropout → Linear(→1).
     """
 
     def __init__(self, pretrained: bool = True, dropout: float = 0.3):
