@@ -194,9 +194,55 @@ def apply_brain_meta_fix(df: pd.DataFrame, source_xlsx: str = DEFAULT_SOURCE_XLS
     return out
 
 
+LUNG_DISEASE_COL = "1 COPD\n2 Asthma \n3 ILDIPF"
+
+#: 원본 엑셀 만성폐질환 칸 -> 모델 입력 코드. 결측은 다른 범주형(tb 등)과 같이 -1.
+LUNG_DISEASE_CODES = {"0": 0, "1": 1, "2": 2, "3": 3, "1, 3": 4}
+LUNG_DISEASE_LABELS = {0: "none", 1: "COPD", 2: "asthma", 3: "ILD/IPF", 4: "COPD+ILD/IPF", -1: "missing"}
+
+
+def recode_lung_disease_from_excel(raw: pd.DataFrame) -> pd.Series:
+    """원본 엑셀(research_id 인덱스)의 만성폐질환 칸을 범주별로 다시 코딩한다.
+
+    [왜 필요한가]
+      merged CSV 의 `lung_disease` 는 천식(2)·ILD/IPF(3)를 실제 결측과 같은 -1 로
+      묶어 두었고, "1, 3"(COPD+ILD) 1명만 3 으로 남아 있다 — 질환이 있는 환자를
+      "모름"으로 입력한 셈이다. 여기서는 원본 범주를 그대로 살리고 실제 결측만 -1 로 둔다.
+    모르는 값이 나오면 죽는다 — 조용히 -1 로 보내면 같은 오류가 되풀이되기 때문이다.
+    """
+    def code(v):
+        if pd.isna(v):
+            return -1
+        key = str(v).strip()
+        key = key[:-2] if key.endswith(".0") else key
+        if key not in LUNG_DISEASE_CODES:
+            raise ValueError(f"unknown lung disease value {v!r}")
+        return LUNG_DISEASE_CODES[key]
+
+    return raw[LUNG_DISEASE_COL].map(code).astype(int).rename("lung_disease")
+
+
+def apply_lung_disease_recode(df: pd.DataFrame, source_xlsx: str = DEFAULT_SOURCE_XLSX) -> pd.DataFrame:
+    """`lung_disease` 를 원본 엑셀 범주로 바꾼 사본 (``recode_lung_disease_from_excel`` 참고)."""
+    src = pd.read_excel(source_xlsx)
+    src["research_id"] = pd.to_numeric(src["연구번호"], errors="coerce")
+    src = src.dropna(subset=["research_id"])
+    src = src.set_index(src["research_id"].astype(int))
+    if src.index.duplicated().any():
+        raise ValueError("duplicate research_id in source excel")
+    recoded = recode_lung_disease_from_excel(src)
+    rids = df["research_id"].astype(int)
+    missing = sorted(set(rids) - set(recoded.index))
+    if missing:
+        raise ValueError(f"research_id(s) {missing} not found in {source_xlsx}")
+    out = df.copy()
+    out["lung_disease"] = rids.map(recoded).to_numpy()
+    return out
+
+
 def load_trimodal_cohort(
     merged_csv: str = DEFAULT_MERGED_CSV, split_csv: str = DEFAULT_SPLIT_CSV,
-    fix_brain_meta: bool = True,
+    fix_brain_meta: bool = True, recode_lung_disease: bool = False,
 ) -> pd.DataFrame:
     """Returns the merged clinical+report frame restricted to the 238-patient
     tri-modal common cohort, indexed by research_id, with split/fold columns
@@ -207,6 +253,9 @@ def load_trimodal_cohort(
     다시 코딩한다(누수 수정, apply_brain_meta_fix 의 docstring 참고).
     False 로 주면 수정 전(legacy) 동작이 되며, 2026-08-02 이전에 기록된 결과
     (예: late fusion OS 0.7221)를 재현할 때 쓴다.
+
+    ``recode_lung_disease`` 는 기본값 False(기존 입력 그대로) — True 면 만성폐질환을
+    원본 범주로 다시 코딩한다(apply_lung_disease_recode 참고, 실험16부터).
     """
     clinical = load_merged_clinical(merged_csv)
     split = load_split(split_csv)
@@ -215,6 +264,8 @@ def load_trimodal_cohort(
         raise ValueError("Some split research_ids are missing from the merged clinical CSV")
     if fix_brain_meta:
         df = apply_brain_meta_fix(df)
+    if recode_lung_disease:
+        df = apply_lung_disease_recode(df)
     return df
 
 
