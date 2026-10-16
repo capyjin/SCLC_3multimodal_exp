@@ -66,6 +66,79 @@ def cox_ph_loss(risk_scores: torch.Tensor, durations: torch.Tensor,
     return -diff[event_mask].mean()
 
 
+COX_TIES = ("efron", "breslow")
+
+
+def cox_partial_nll(risk_scores: torch.Tensor, durations: torch.Tensor,
+                    events: torch.Tensor, ties: str = "efron") -> torch.Tensor:
+    """동점 사건을 정식으로 처리하는 Cox 음의 부분우도 (사건 1건당 평균).
+
+    ``cox_ph_loss`` 는 시간 내림차순 정렬 뒤 ``logcumsumexp`` 를 쓰므로 같은 시각의
+    환자들이 **정렬 순서에 따라** 서로의 위험집합에 들어가거나 빠진다 — 동점이 있으면
+    입력 순서만 바꿔도 값이 달라지고, Breslow 도 Efron 도 아니다. 기존 결과 재현용으로
+    그 함수는 그대로 두고, 새 실험(실험16~)은 이 함수를 쓴다.
+
+    고유 사건시각 t_j 마다 D_j = 그 시각의 사건(d_j명), R_j = {i: T_i >= t_j},
+    A_j = sum_{R_j} e^eta, B_j = sum_{D_j} e^eta 라 하면
+        efron   : NLL = -(1/N_event) sum_j [ sum_{D_j} eta - sum_{l<d_j} log(A_j - (l/d_j) B_j) ]
+        breslow : 위에서 l 항을 빼고 log A_j 를 d_j 번
+    log(A - cB) = log A + log1p(-c exp(log B - log A)) 로 계산한다 (c < 1, B <= A 라 안정적).
+    lifelines ``CoxPHFitter`` 의 기본 ties 가 efron 이다 (late fusion 결합기와 같은 규칙).
+
+    사건이 0건이면 그래프가 붙은 0 을 돌려준다 (작은 미니배치에서 생길 수 있다).
+    """
+    if ties not in COX_TIES:
+        raise ValueError(f"unknown ties {ties!r}; expected one of {list(COX_TIES)}")
+    risk = risk_scores.reshape(-1)
+    time = durations.reshape(-1).to(risk.device)
+    event = events.reshape(-1).to(risk.device) == 1
+    if not (risk.numel() == time.numel() == event.numel()):
+        raise ValueError(f"length mismatch: risk {risk.numel()}, time {time.numel()}, "
+                         f"event {event.numel()}")
+    n_event = int(event.sum())
+    if n_event == 0:
+        return risk.sum() * 0.0
+
+    order = torch.argsort(time, descending=True, stable=True)
+    risk, time, event = risk[order], time[order], event[order]
+
+    # 같은 시각 묶음(group). 내림차순이라 묶음의 마지막 위치까지가 그 시각의 위험집합이다.
+    _, group, counts = torch.unique_consecutive(time, return_inverse=True, return_counts=True)
+    ends = torch.cumsum(counts, 0) - 1
+    log_a = torch.logcumsumexp(risk, 0)[ends]                          # [G]
+
+    ev_idx = torch.nonzero(event, as_tuple=True)[0]
+    ev_group = group[ev_idx]
+    ev_risk = risk[ev_idx]
+    n_groups = counts.numel()
+    d = torch.zeros(n_groups, dtype=risk.dtype, device=risk.device).index_add_(
+        0, ev_group, torch.ones_like(ev_risk))
+
+    if ties == "breslow":
+        log_den = log_a[ev_group]
+    else:
+        # 묶음별 log B (사건만의 logsumexp) — 최댓값을 빼서 안정적으로
+        gmax = torch.full((n_groups,), float("-inf"), dtype=risk.dtype, device=risk.device)
+        gmax = gmax.scatter_reduce(0, ev_group, ev_risk.detach(), reduce="amax")
+        b = torch.zeros(n_groups, dtype=risk.dtype, device=risk.device).index_add_(
+            0, ev_group, torch.exp(ev_risk - gmax[ev_group]))
+        log_b = torch.log(b.clamp_min(torch.finfo(risk.dtype).tiny)) + gmax.nan_to_num(neginf=0.0)
+        # 묶음 안 사건의 순번 l = 0..d_j-1 (Efron 식은 순번에 대칭이라 순서는 상관없다)
+        csum = torch.cumsum(event.to(risk.dtype), 0)[ev_idx]           # 1..N_event
+        first = torch.cumsum(d, 0) - d                                 # 묶음 직전까지 사건 수
+        rank = csum - 1 - first[ev_group]
+        frac = rank / d[ev_group]
+        ratio = torch.exp(log_b[ev_group] - log_a[ev_group])          # <= 1, frac <= (d-1)/d
+        log_den = log_a[ev_group] + torch.log1p(-frac * ratio)
+
+    return -(ev_risk - log_den).sum() / n_event
+
+
+def cox_efron_loss(risk_scores, durations, events):
+    """``cox_partial_nll(ties="efron")`` — ``train_one_epoch`` 등에 넘길 손실 함수."""
+    return cox_partial_nll(risk_scores, durations, events, ties="efron")
+
+
 @torch.no_grad()
 def evaluate_c_index(model: nn.Module, loader: DataLoader, device: torch.device) -> float:
     model.eval()
@@ -87,8 +160,40 @@ def evaluate_c_index(model: nn.Module, loader: DataLoader, device: torch.device)
     )
 
 
+@torch.no_grad()
+def evaluate_loss(model: nn.Module, dataset, device: torch.device, loss_fn,
+                  batch_size: int = 64) -> float:
+    """데이터셋 전체를 한 번에 본 Cox 손실 (eval 모드, 순서 고정). 진단 기록용.
+
+    전역 난수 상태를 저장했다가 되돌린다 — DataLoader 를 한 번 더 돌리면 전역 RNG 를
+    소모해 이후 학습(셔플·dropout) 경로가 바뀌기 때문이다. 이 함수를 불러도 학습 결과는
+    부르지 않았을 때와 같아야 한다.
+    """
+    cpu_state = torch.get_rng_state()
+    cuda_state = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
+    try:
+        model.eval()
+        risks, durs, evts = [], [], []
+        for batch in DataLoader(dataset, batch_size=batch_size, shuffle=False):
+            if len(batch) == 4:
+                images, tabular, dur, evt = batch
+                risk = model(images.to(device), tabular.to(device))
+            else:
+                images, dur, evt = batch
+                risk = model(images.to(device))
+            risks.append(risk.reshape(-1).float().cpu())
+            durs.append(torch.as_tensor(dur, dtype=torch.float32))
+            evts.append(torch.as_tensor(evt, dtype=torch.float32))
+        return float(loss_fn(torch.cat(risks), torch.cat(durs), torch.cat(evts)))
+    finally:
+        torch.set_rng_state(cpu_state)
+        if cuda_state is not None:
+            torch.cuda.set_rng_state_all(cuda_state)
+
+
 def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optimizer,
-                    device: torch.device, grad_modulator=None, aux_loss_fn=None) -> float:
+                    device: torch.device, grad_modulator=None, aux_loss_fn=None,
+                    loss_fn=None) -> float:
     """grad_modulator: loss.backward() 직후 optimizer.step() 직전에 호출되는 훅.
     시그니처 (model, images, tabular, durations, events) -> None 이며,
     브랜치별 gradient를 직접 조절하는 용도(OGM-GE 등). None이면 기존 동작과 완전히 동일.
@@ -98,7 +203,11 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optim
     반환값이 주손실(Cox)에 그대로 더해진다(같은 그래프에서 backward 되므로
     gradient 가 정상적으로 흐른다). 리스크앵커 정합손실 등 손실면 자체를
     바꾸는 정칙화 항에 쓴다(실험11의 anchor_loss.make_anchor_loss_fn 참고).
-    None이면 기존 동작과 완전히 동일(항등성은 실험11의 C2 회귀 검사로 확인)."""
+    None이면 기존 동작과 완전히 동일(항등성은 실험11의 C2 회귀 검사로 확인).
+
+    loss_fn: Cox 손실 함수 ``(risk, durations, events) -> scalar``. None 이면 기존
+    ``cox_ph_loss`` (기존 결과 재현). 실험16부터 ``cox_efron_loss`` 를 넘긴다."""
+    loss_fn = cox_ph_loss if loss_fn is None else loss_fn
     model.train()
     total_loss, total_count = 0.0, 0
     pbar = tqdm(loader, desc="Training", leave=False)
@@ -117,7 +226,7 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optim
         optimizer.zero_grad()
         risk_scores = (model(images, tabular).squeeze(1) if tabular is not None
                        else model(images).squeeze(1))
-        loss = cox_ph_loss(risk_scores, durations, events)
+        loss = loss_fn(risk_scores, durations, events)
         if aux_loss_fn is not None:
             loss = loss + aux_loss_fn(model, images, tabular, durations, events)
         loss.backward()
@@ -135,28 +244,94 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: optim.Optim
 
 
 def fit(model, train_loader, val_loader, optimizer, device, epochs, save_path,
-       grad_modulator=None, aux_loss_fn=None):
+       grad_modulator=None, aux_loss_fn=None, loss_fn=None, patience=None, val_loss_fn=None,
+       monitor: str = "cindex", min_delta: float = 0.0, min_epoch: int = 1):
+    """``epochs`` 동안 학습하고 val C-index 가 가장 높은 epoch 의 가중치를 저장한다.
+
+    기본값(loss_fn=None, patience=None, val_loader 있음)은 기존 동작과 완전히 같다.
+      loss_fn   : ``train_one_epoch`` 참고 (None = 기존 cox_ph_loss)
+      patience  : val C-index 가 이 epoch 수만큼 연속으로 나아지지 않으면 멈춘다.
+                  동점은 개선으로 치지 않으므로 더 이른 epoch 이 남는다.
+      val_loader=None : 고정 epoch 재학습 (nested CV 의 outer 재학습) — 마지막 epoch 을 저장.
+    history 의 각 행에 ``saved`` (그 epoch 가중치를 저장했는지)를 남긴다 — 선택 epoch 기록용.
+      val_loss_fn : 주면 매 epoch val 전체·train 전체의 손실(eval 모드)을 ``val_loss`` /
+                    ``train_loss_eval`` 로 남긴다. ``evaluate_loss`` 가 난수 상태를 되돌리므로
+                    기록만으로는 학습 경로가 바뀌지 않는다.
+      monitor   : 최적 epoch·정지 판단 지표. "cindex"(기본, 기존 동작) 또는 "loss"
+                  (val 손실 = ``val_loss_fn``, 실험16: 정지용 분할 Efron NLL).
+      min_delta : monitor="loss" 일 때 개선 = val_loss < 최저값 - min_delta (동점·미세 개선은 아님).
+      min_epoch : 이 epoch 전에는 최적 후보로 잡지도, patience 를 세지도 않는다 (기본 1 = 기존 동작).
+                  학습 초반 손실이 거의 안 움직이는 동안 patience 가 소진되는 것을 막는다.
+    """
+    if val_loader is not None and min_epoch > epochs:
+        raise ValueError(f"min_epoch {min_epoch} > epochs {epochs}: 저장될 epoch 이 없다")
+    if monitor not in ("cindex", "loss"):
+        raise ValueError(f"unknown monitor {monitor!r}")
+    if monitor == "loss" and val_loss_fn is None:
+        raise ValueError('monitor="loss" 에는 val_loss_fn 이 필요하다')
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     best_val_cindex = -np.inf
+    best_val_loss = np.inf
+    since_best = 0
     history: list[dict] = []
 
     for epoch in tqdm(range(1, epochs + 1), desc="Epochs"):
         train_loss = train_one_epoch(model, train_loader, optimizer, device,
-                                     grad_modulator, aux_loss_fn)
+                                     grad_modulator, aux_loss_fn, loss_fn=loss_fn)
         train_cindex = evaluate_c_index(model, train_loader, device)
+        if val_loader is None:
+            print(f"[Epoch {epoch:03d}] train_loss={train_loss:.4f} "
+                  f"train_cindex={train_cindex:.4f} (val 없음 - 고정 epoch)")
+            saved = epoch == epochs
+            if saved:
+                torch.save(model.state_dict(), save_path)
+            history.append({"epoch": int(epoch), "train_loss": float(train_loss),
+                            "train_cindex": float(train_cindex), "val_cindex": None,
+                            "saved": saved})
+            continue
+
         val_cindex = evaluate_c_index(model, val_loader, device)
         print(f"[Epoch {epoch:03d}] train_loss={train_loss:.4f} "
               f"train_cindex={train_cindex:.4f} val_cindex={val_cindex:.4f}")
-        history.append({"epoch": int(epoch), "train_loss": float(train_loss),
-                        "train_cindex": float(train_cindex), "val_cindex": float(val_cindex)})
+        row = {"epoch": int(epoch), "train_loss": float(train_loss),
+               "train_cindex": float(train_cindex), "val_cindex": float(val_cindex)}
+        if val_loss_fn is not None:
+            row["val_loss"] = evaluate_loss(model, val_loader.dataset, device, val_loss_fn)
+            row["train_loss_eval"] = evaluate_loss(model, train_loader.dataset, device, val_loss_fn)
+            if not (np.isfinite(row["val_loss"]) and np.isfinite(row["train_loss_eval"])):
+                raise FloatingPointError(f"epoch {epoch}: 손실이 유한하지 않다 {row}")
+        if epoch < min_epoch:
+            saved = False
+        elif monitor == "loss":
+            saved = row["val_loss"] < best_val_loss - min_delta
+        else:
+            saved = val_cindex > best_val_cindex
+        row["saved"] = bool(saved)
+        history.append(row)
 
-        if val_cindex > best_val_cindex:
+        if saved:
             best_val_cindex = val_cindex
+            best_val_loss = row.get("val_loss", best_val_loss)
+            since_best = 0
             torch.save(model.state_dict(), save_path)
-            print(f"  -> best model saved (val_cindex={best_val_cindex:.4f})")
+            print(f"  -> best model saved (val_cindex={val_cindex:.4f}"
+                  + (f", val_loss={row['val_loss']:.4f})" if monitor == "loss" else ")"))
+        elif epoch >= min_epoch:
+            since_best += 1
+            if patience is not None and since_best >= patience:
+                print(f"  -> early stop: {patience} epoch 연속 개선 없음")
+                break
 
-    print(f"\nBest validation c-index: {best_val_cindex:.4f}")
+    if val_loader is not None:
+        print(f"\nBest validation c-index: {best_val_cindex:.4f}"
+              + (f" (monitor=loss, best val_loss {best_val_loss:.4f})" if monitor == "loss" else ""))
     return history
+
+
+def best_epoch(history: list[dict]) -> int | None:
+    """``fit`` 이 마지막으로 가중치를 저장한 epoch (= 평가에 쓰인 가중치)."""
+    saved = [row["epoch"] for row in history if row.get("saved")]
+    return saved[-1] if saved else None
 
 
 def fold_plan(cohort_df: pd.DataFrame, max_folds: int | None = None):
@@ -170,6 +345,27 @@ def fold_plan(cohort_df: pd.DataFrame, max_folds: int | None = None):
               for name in ("train", "val", "test")}
         plan.append((fold, ids))
     return plan
+
+
+def _extra_frame(ev, cohort_df: pd.DataFrame) -> pd.DataFrame | None:
+    """``extra_eval_ids`` 환자의 임상 행 (분할 파일 밖 환자라 전체 코호트에서 가져온다)."""
+    if not ev.extra_eval_ids or ev.fold_end_hook is None:
+        return None
+    if getattr(ev, "cohort_transform", None) is not None:
+        raise ValueError("extra_eval_ids 와 cohort_transform 은 같이 쓸 수 없다")
+    full = cohort.load_trimodal_cohort(
+        ev.merged_csv, cohort.DEFAULT_SPLIT_CSV,
+        fix_brain_meta=getattr(ev, "fix_brain_meta", True),
+        recode_lung_disease=getattr(ev, "recode_lung_disease", False))
+    frame = full.drop_duplicates("research_id").set_index("research_id")
+    cols = [c for c in cohort_df.columns if c != "research_id"]
+    return frame.loc[ev.extra_eval_ids, cols]
+
+
+def _check_extra_disjoint(extra_ids, ids) -> None:
+    overlap = set(extra_ids) & set(ids["train"] + ids["val"] + ids["test"])
+    if overlap:
+        raise ValueError(f"extra_eval_ids 가 이 fold 의 train/val/test 와 겹친다: {sorted(overlap)}")
 
 
 class TrimodalEvaluator:
@@ -190,9 +386,28 @@ class TrimodalEvaluator:
         device: torch.device | None = None, num_workers: int = 4, seed: int = 42,
         model_factory=None, grad_modulator=None, text_source: str = "concl_find",
         extra_numeric_fn=None, text_encoder_fn=None, fix_brain_meta: bool = True,
-        clinical_columns_fn=None, aux_loss_factory=None,
+        clinical_columns_fn=None, aux_loss_factory=None, recode_lung_disease: bool = False,
+        loss_fn=None, patience: int | None = None, fold_end_hook=None,
+        extra_eval_ids: list[int] | None = None, val_loss_fn=None,
+        monitor: str = "cindex", min_delta: float = 0.0, min_epoch: int = 1,
     ):
         self.target = target
+        # [실험16] loss_fn: Cox 손실(None = 기존 cox_ph_loss). patience: fit 참고.
+        # fold_end_hook(fold=, ids=, model=, datasets=, device=): fold 학습이 끝나고 저장된
+        # 최적 가중치를 불러 eval() 로 둔 직후 호출 — 고정 인코더 특징 추출용.
+        # val 환자가 없는 분할(outer 재학습)이면 val 없이 고정 epoch 으로 학습한다.
+        # 셋 다 기본값이면 기존 동작과 완전히 동일.
+        self.loss_fn = loss_fn
+        self.patience = patience
+        self.val_loss_fn = val_loss_fn          # fit 참고
+        self.monitor, self.min_delta, self.min_epoch = monitor, min_delta, min_epoch
+        self.fold_end_hook = fold_end_hook
+        # extra_eval_ids: 분할 파일 밖 환자(예: nested CV 의 outer test)에 대해서도 이 fold
+        # 모델의 특징·위험점수를 뽑고 싶을 때. 학습이 끝난 뒤 같은 fold 전처리(train 으로만
+        # 적합)로 Dataset 을 만들어 hook 의 datasets["extra"] 로 넘길 뿐 — 학습·C-index 에는
+        # 쓰이지 않는다. hook 이 없으면 무시된다.
+        self.extra_eval_ids = list(extra_eval_ids) if extra_eval_ids else None
+
         self.model_factory = model_factory
         self.grad_modulator = grad_modulator
         # aux_loss_factory: fold 마다 한 번, (fold, ids) -> aux_loss_fn 로 호출되는
@@ -215,6 +430,9 @@ class TrimodalEvaluator:
         # fix_brain_meta: brain_meta 를 기저 시점 전이만 1 로 다시 코딩(누수 수정).
         # 기본 True = 누수 수정본. False 면 2026-08-02 이전 결과 재현.
         self.fix_brain_meta = fix_brain_meta
+        # recode_lung_disease: 만성폐질환을 원본 엑셀 범주로 다시 코딩(천식·ILD 를 결측과
+        # 분리). 기본 False = 기존 입력 그대로 (cohort.apply_lung_disease_recode 참고).
+        self.recode_lung_disease = recode_lung_disease
         # clinical_columns_fn: 임상 블록에 쓸 컬럼 목록을 정하는 콜러블
         # ``(df) -> (standardize_cols, categorical_cols)``. None 이면 기존
         # ``features.resolve_clinical_columns`` 가 그대로 쓰여 동작이 완전히 동일하다.
@@ -259,11 +477,13 @@ class TrimodalEvaluator:
 
     def run(self) -> "TrimodalEvaluator":
         cohort_df = cohort.load_trimodal_cohort(self.merged_csv, self.split_csv,
-                                               fix_brain_meta=self.fix_brain_meta)
+                                               fix_brain_meta=self.fix_brain_meta,
+                                               recode_lung_disease=self.recode_lung_disease)
         clinical_frame = cohort_df.drop_duplicates("research_id").set_index("research_id")
         resolve_columns = self.clinical_columns_fn or features.resolve_clinical_columns
         standardize_cols, categorical_cols = resolve_columns(clinical_frame)
         corpus, _ = features.load_text_corpus(self.merged_csv, source=self.text_source)
+        extra_frame = _extra_frame(self, cohort_df)
 
         self.c_indices, self.fold_records = [], []
         self.oof_predictions, self.training_history = [], []
@@ -311,8 +531,8 @@ class TrimodalEvaluator:
             generator.manual_seed(self.seed + fold)
             train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True,
                                      generator=generator, **loader_kwargs)
-            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
-                                   **loader_kwargs)
+            val_loader = (DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
+                                    **loader_kwargs) if len(val_ds) else None)
             test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False,
                                     **loader_kwargs)
 
@@ -345,12 +565,35 @@ class TrimodalEvaluator:
             save_path = os.path.join(self.save_dir, f"fold{fold}_early_fusion_{self.target}.pt")
             fold_history = fit(model, train_loader, val_loader, optimizer, self.device,
                                self.epochs, save_path,
-                               grad_modulator=self.grad_modulator, aux_loss_fn=aux_loss_fn)
+                               grad_modulator=self.grad_modulator, aux_loss_fn=aux_loss_fn,
+                               loss_fn=self.loss_fn, patience=self.patience,
+                               val_loss_fn=self.val_loss_fn, monitor=self.monitor,
+                               min_delta=self.min_delta, min_epoch=self.min_epoch)
             self.training_history.extend(
                 [{"target": self.target, "fold": fold, **row} for row in fold_history])
 
             model.load_state_dict(torch.load(save_path, map_location=self.device))
             model.eval()
+            if self.fold_end_hook is not None:
+                datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
+                if extra_frame is not None:
+                    _check_extra_disjoint(self.extra_eval_ids, ids)
+                    extra_tab, _, _ = features.build_fold_multimodal_tabular(
+                        clinical_frame.loc[ids["train"]], clinical_frame.loc[ids["val"]],
+                        extra_frame, corpus, standardize_cols, categorical_cols,
+                        tfidf_max_features=self.tfidf_max_features,
+                        tfidf_ngram_range=self.tfidf_ngram_range,
+                        extra_numeric_fn=self.extra_numeric_fn, text_encoder_fn=self.text_encoder_fn,
+                    )
+                    if not np.array_equal(extra_tab["train"], tabular["train"]):
+                        raise RuntimeError(f"fold {fold}: extra 전처리가 학습 때와 다르다")
+                    extra_samples = ds.preprocess_data(self.image_dir, extra_frame.reset_index(),
+                                                       self.target, self.gray_scale)
+                    _, datasets["extra"] = ds.create_dataset(
+                        train_samples, extra_samples, self.resize, False, self.gray_scale, False,
+                        train_tabular=tabular["train"], test_tabular=extra_tab["test"])
+                self.fold_end_hook(fold=fold, ids=ids, model=model, device=self.device,
+                                   datasets=datasets)
 
             risks, durations, events = [], [], []
             with torch.no_grad():
@@ -370,6 +613,7 @@ class TrimodalEvaluator:
                 "target": self.target, "fold": fold,
                 "modality": "early_fusion_image_clinical_report",
                 "c_index": round(float(ci), 4), "n": len(risks),
+                **({"best_epoch": best_epoch(fold_history)} if self.fold_end_hook else {}),
                 "event_count": int((events == 1).sum()),
                 "censored_count": int((events == 0).sum()),
             })
@@ -405,8 +649,27 @@ class ImageOnlyEvaluator:
         device: torch.device | None = None, num_workers: int = 4, seed: int = 42,
         model_factory=None, optimizer_factory=None, augment: bool = False,
         ckpt_tag: str = "image_only", cohort_transform=None,
+        loss_fn=None, patience: int | None = None, fold_end_hook=None,
+        extra_eval_ids: list[int] | None = None, val_loss_fn=None,
+        monitor: str = "cindex", min_delta: float = 0.0, min_epoch: int = 1,
     ):
         self.target = target
+        # [실험16] loss_fn: Cox 손실(None = 기존 cox_ph_loss). patience: fit 참고.
+        # fold_end_hook(fold=, ids=, model=, datasets=, device=): fold 학습이 끝나고 저장된
+        # 최적 가중치를 불러 eval() 로 둔 직후 호출 — 고정 인코더 특징 추출용.
+        # val 환자가 없는 분할(outer 재학습)이면 val 없이 고정 epoch 으로 학습한다.
+        # 셋 다 기본값이면 기존 동작과 완전히 동일.
+        self.loss_fn = loss_fn
+        self.patience = patience
+        self.val_loss_fn = val_loss_fn          # fit 참고
+        self.monitor, self.min_delta, self.min_epoch = monitor, min_delta, min_epoch
+        self.fold_end_hook = fold_end_hook
+        # extra_eval_ids: 분할 파일 밖 환자(예: nested CV 의 outer test)에 대해서도 이 fold
+        # 모델의 특징·위험점수를 뽑고 싶을 때. 학습이 끝난 뒤 같은 fold 전처리(train 으로만
+        # 적합)로 Dataset 을 만들어 hook 의 datasets["extra"] 로 넘길 뿐 — 학습·C-index 에는
+        # 쓰이지 않는다. hook 이 없으면 무시된다.
+        self.extra_eval_ids = list(extra_eval_ids) if extra_eval_ids else None
+
         self.merged_csv = merged_csv
         self.image_dir = image_dir
         self.split_csv = split_csv
@@ -446,6 +709,7 @@ class ImageOnlyEvaluator:
         if self.cohort_transform is not None:
             cohort_df = self.cohort_transform(cohort_df)
         clinical_frame = cohort_df.drop_duplicates("research_id").set_index("research_id")
+        extra_frame = _extra_frame(self, cohort_df)
 
         self.c_indices, self.fold_records = [], []
         self.oof_predictions, self.training_history = [], []
@@ -478,8 +742,8 @@ class ImageOnlyEvaluator:
             generator.manual_seed(self.seed + fold)
             train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True,
                                      generator=generator, **loader_kwargs)
-            val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
-                                   **loader_kwargs)
+            val_loader = (DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
+                                    **loader_kwargs) if len(val_ds) else None)
             test_loader = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False,
                                     **loader_kwargs)
 
@@ -495,12 +759,24 @@ class ImageOnlyEvaluator:
 
             save_path = os.path.join(self.save_dir, f"fold{fold}_{self.ckpt_tag}_{self.target}.pt")
             fold_history = fit(model, train_loader, val_loader, optimizer, self.device,
-                               self.epochs, save_path)
+                               self.epochs, save_path, loss_fn=self.loss_fn, patience=self.patience,
+                               val_loss_fn=self.val_loss_fn, monitor=self.monitor,
+                               min_delta=self.min_delta, min_epoch=self.min_epoch)
             self.training_history.extend(
                 [{"target": self.target, "fold": fold, **row} for row in fold_history])
 
             model.load_state_dict(torch.load(save_path, map_location=self.device))
             model.eval()
+            if self.fold_end_hook is not None:
+                datasets = {"train": train_ds, "val": val_ds, "test": test_ds}
+                if extra_frame is not None:
+                    _check_extra_disjoint(self.extra_eval_ids, ids)
+                    extra_samples = ds.preprocess_data(self.image_dir, extra_frame.reset_index(),
+                                                       self.target, self.gray_scale)
+                    _, datasets["extra"] = ds.create_dataset(
+                        train_samples, extra_samples, self.resize, False, self.gray_scale, False)
+                self.fold_end_hook(fold=fold, ids=ids, model=model, device=self.device,
+                                   datasets=datasets)
 
             risks, durations, events = [], [], []
             with torch.no_grad():
@@ -523,6 +799,7 @@ class ImageOnlyEvaluator:
             self.fold_records.append({
                 "target": self.target, "modality": "image_only", "fold": fold,
                 "c_index": round(float(ci), 4),
+                **({"best_epoch": best_epoch(fold_history)} if self.fold_end_hook else {}),
                 "n": len(risks), "event_count": int((events == 1).sum()),
                 "censored_count": int((events == 0).sum()),
             })
