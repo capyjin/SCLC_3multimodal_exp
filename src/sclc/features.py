@@ -222,6 +222,9 @@ def build_fold_multimodal_tabular(
     # fits (StandardScaler) on the train fold, or val/test transform() would
     # KeyError on ids that aren't in train_df.
     full_df = pd.concat([train_df, val_df, test_df])
+    # 같은 환자가 두 split 에 동시에 있으면(예: 실험16 lr_check 의 val == test) loc 가 행을 중복
+    # 반환한다. 행 값은 환자별로 같으므로 첫 행만 남긴다 — 중복이 없으면 아무 일도 하지 않는다.
+    full_df = full_df[~full_df.index.duplicated()]
     clin_enc = ClinicalEncoder(full_df, clinical_standardize_cols, clinical_categorical_cols)
     clin_train = clin_enc.fit_transform(train_df.index)
     clin_val = clin_enc.transform(val_df.index) if len(val_df) else np.empty((0, clin_enc.dim), dtype="float32")
