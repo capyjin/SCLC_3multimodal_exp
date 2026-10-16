@@ -15,8 +15,11 @@ cd "$DIR"
 mkdir -p build
 if [ $# -gt 0 ]; then names=("$@"); else names=(fig1_late_fusion_overview fig2_fusion_strategies); fi
 for f in "${names[@]}"; do
-  pdflatex -interaction=nonstopmode -halt-on-error -output-directory=build "$f.tex" > "build/$f.stdout" 2>&1 \
-    || { echo "!! pdflatex failed for $f (see build/$f.log)"; grep -n -A3 "^!" "build/$f.log" | head -30; exit 1; }
+  # 첫 줄이 "% !TEX program = xelatex" 이면 xelatex (시스템 서체, 예: Times New Roman 을 fontspec 으로 쓸 때)
+  engine=pdflatex
+  head -1 "$f.tex" | grep -q '^% !TEX program = xelatex' && engine=xelatex
+  "$engine" -interaction=nonstopmode -halt-on-error -output-directory=build "$f.tex" > "build/$f.stdout" 2>&1 \
+    || { echo "!! $engine failed for $f (see build/$f.log)"; grep -n -A3 "^!" "build/$f.log" | head -30; exit 1; }
   cp "build/$f.pdf" "$f.pdf"
   pdftocairo -svg "$f.pdf" "$f.svg"
   pdftoppm -png -r 220 -singlefile "$f.pdf" "$f"
