@@ -20,6 +20,8 @@ nested CV 안에서 학습하고, 두 인코더의 출력을 다섯 가지 방�
 ├── summarize.py                    ③ 결과 요약           → outputs/gmu_nested/report_v2/
 ├── analyze_gated_late_fusion.py    ④ Gated Late Fusion (사후) → outputs/gmu_nested/gated_nested/
 ├── analyze_gmu_linear_part.py      ⑤ GMU 선형 부분 (사후) → outputs/gmu_nested/linear_projection_train_only/
+├── run_baselines.py                ⑥ 비교 모델 (논문 Table 2·3) → outputs/gmu_nested/baselines_v1_{os,pfs}/
+├── make_nested_tables.py           ⑦ Table 2·3 LaTeX        → report_assets/paper/tab{2,3}_*_nested.tex
 │
 └── diagnostics/                    ← 학습 전·후 점검 (결과 아님, 재현 기록용)
     ├── checklist.py                PASS/FAIL 기록 공통 코드
@@ -109,6 +111,21 @@ python experiments/실험16_GMU_nestedCV/diagnostics/check_run_outputs.py --targ
 특징 수준 결합(Concat·Constant Gate·GMU)은 Late Fusion 보다 낮고, 환자별 gate(GMU vs Constant Gate,
 Gated Late Fusion vs Late Fusion)의 이득은 없었다.
 기존 비-nested late fusion(OS 0.7224 / PFS 0.6470)은 평가 절차가 달라 이 표와 직접 비교하지 않는다.
+
+## ⑥ 비교 모델 (논문 Table 2·3)
+
+단일 모달(임상 MLP · 판독지 TF-IDF/mBERT/KM-BERT/RadBERT · 영상 ResNet-18/ResNet-50 RadImageNet)과 영상이 묶인
+joint 모델(임상+영상, 판독지+영상)을 **인코더와 같은 nested 절차**로 학습한다: outer k 마다 inner 4-fold 에서 Fit 학습·S 정지로
+최적 epoch 을 얻고, 그 중앙값으로 T_k 전체를 재학습해 O_k 에서 평가한다. 분할·seed·정지 규칙·임상 19변수 전처리는 ② 와 같다.
+설정은 `config.BASELINES` (trainer 별 학습 규칙은 `config.ENCODERS`), 학습 함수는 `train.run_baseline`.
+
+- 임상+판독지 joint 와 Simple CNN 은 ② 의 `tabular_only` · `image_only` 를 그대로 쓴다.
+- `--verify` 는 그 두 arm 을 ⑥ 경로로 다시 학습해 run_v2 와 비교한다. outer 1 에서 inner 4개 + refit 의
+  가중치 해시, 재학습 epoch, O_k 위험점수, C-index 가 OS·PFS 모두 일치했다 (`outputs/gmu_nested/verify_{os,pfs}/verify.json`).
+- 판독지 인코더는 모두 frozen mean-pooling 768 (축소·표준화 없음). 한글은 RadBERT 만 ko2en 치환, mBERT·KM-BERT 는 원문.
+- ResNet 계열은 기존 비교 실험 설정(224 해상도, 좌우반전 증강, 백본 lr 1e-5 · head 1e-3)을 쓴다.
+
+⑦ 은 ② 와 ⑥ 의 fold 별 C-index 로 표를 만든다 (평균 ± 표본 SD, Late Fusion 대비 쌍대 t 검정). 기존 비-nested 표와 섞지 않는다.
 
 ## 참고
 

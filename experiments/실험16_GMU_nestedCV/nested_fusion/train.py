@@ -11,9 +11,9 @@ from sclc import foldsafe_clinical as fsc
 from sclc.model import MODALITY_CONFIGS, make_model_factory
 from sclc.train import ImageOnlyEvaluator, TrimodalEvaluator, cox_efron_loss
 
-from .config import (CANDIDATES, COMMON_RULE, ENCODER_STOP, ENCODERS, LR_RULES, SELECTION_TOLERANCE,
+from .config import (BASELINES, CANDIDATES, COMMON_RULE, ENCODER_STOP, ENCODERS, LR_RULES, SELECTION_TOLERANCE,
                      SIMPLICITY_ORDER, TRAIN_RULE, USED_KEYS, guard)
-from .processing import ImageFeatureHook, TabularFeatureHook
+from .processing import ImageFeatureHook, StateHook, TabularFeatureHook
 
 
 # ── 인코더 학습 ──
@@ -46,6 +46,61 @@ def run_encoders(kind, target, split_csv, epochs, patience, seed, save_dir, extr
                     guard(bool(torch.isfinite(tensor).all()), f"{kind} fold {fold} {split}/{name} 에 비유한값")
             guard(torch.allclose(d["risk"], d["head_risk"], atol=1e-4),
                   f"{kind} fold {fold} {split}: 추출 특징으로 위험점수가 재현되지 않는다")
+    return store, ev
+
+
+# ── ⑥ 비교 모델 학습 ──
+def image_model_factory(spec: dict):
+    """영상 단독 비교 모델의 (model_factory, optimizer_factory). SimpleCNN 은 (None, None) 으로 evaluator 기본 모델을 쓴다."""
+    import torch.optim as optim
+
+    if spec["backbone"] == "simplecnn":
+        return None, None
+    from sclc.model import RadImageNetDeepSurv, ResNet18DeepSurv
+    if spec["backbone"] == "resnet18":
+        make = lambda: ResNet18DeepSurv(gray_scale=True, pretrained=True, dropout=spec["dropout"])
+        backbone = lambda m: m.base
+    elif spec["backbone"] == "radimagenet":
+        make = lambda: RadImageNetDeepSurv(pretrained=True, dropout=spec["dropout"])
+        backbone = lambda m: m.backbone
+    else:
+        raise ValueError(f"unknown backbone {spec['backbone']!r}")
+
+    def optimizer_factory(model):
+        return optim.Adam([{"params": backbone(model).parameters(), "lr": spec["backbone_lr"]},
+                           {"params": model.head.parameters(), "lr": spec["head_lr"]}],
+                          weight_decay=spec["weight_decay"])
+
+    return make, optimizer_factory
+
+
+def run_baseline(name, target, split_csv, epochs, patience, seed, save_dir, extra_ids, ctx, audit, min_epoch=None):
+    """비교 모델 하나를 분할 파일의 fold 마다 학습한다. evaluator 와 학습 인자는 run_encoders 와 같고 모델만 다르다.
+    돌려주는 store 에는 fold 별 분할 ID 와 가중치 해시만 있다 (특징 추출 없음)."""
+    spec = BASELINES[name]
+    rule = ENCODERS[spec["trainer"]]
+    store = {}
+    common = dict(target=target, epochs=epochs, seed=seed, split_csv=split_csv, save_dir=save_dir,
+                  loss_fn=cox_efron_loss, patience=patience, extra_eval_ids=extra_ids, num_workers=4,
+                  val_loss_fn=cox_efron_loss, monitor=ENCODER_STOP["monitor"],
+                  min_delta=ENCODER_STOP["min_delta"],
+                  min_epoch=rule["min_epoch"] if min_epoch is None else min_epoch,
+                  batch_size=rule["batch_size"], fold_end_hook=StateHook(store, keep_model=False))
+    if spec["trainer"] == "tabular":
+        ev = TrimodalEvaluator(
+            lr=rule["lr"], weight_decay=rule["weight_decay"],
+            model_factory=make_model_factory(MODALITY_CONFIGS[spec["model_config"]]),
+            clinical_columns_fn=fsc.baseline_clinical_columns,
+            extra_numeric_fn=fsc.make_extra_numeric_fn(ctx["raw"], audit), recode_lung_disease=True,
+            **ctx["report_kwargs"][spec["report"]], **common).run()
+    else:
+        model_factory, optimizer_factory = image_model_factory(spec)
+        extra = ({} if spec["backbone"] == "simplecnn" else
+                 dict(resize=spec["resize"], augment=spec["augment"], model_factory=model_factory,
+                      optimizer_factory=optimizer_factory))
+        ev = ImageOnlyEvaluator(lr=rule["lr"], weight_decay=rule["weight_decay"],
+                                ckpt_tag=f"image_{spec['backbone']}", **extra, **common).run()
+    guard(sorted(store) == sorted(r["fold"] for r in ev.fold_records), f"{name}: hook 기록과 fold 기록이 다르다")
     return store, ev
 
 

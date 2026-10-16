@@ -50,6 +50,34 @@ TRAIN_RULE = {**LR_RULES[1e-3], **COMMON_RULE}
 # GatedLateFusion: gate 계수 L2 페널티 후보
 GATED_LATE_LAMBDAS = (0.01, 0.1, 1.0, 10.0, 100.0)
 
+# ⑥ 단일·이중 모달 비교 모델(논문 Table 2·3). 인코더와 같은 nested 절차(inner Fit 학습·S 정지 → 최적 epoch 중앙값으로
+# T_k 재학습 → O_k 평가)를 쓴다. 학습 규칙은 trainer 와 같은 이름의 ENCODERS 항목을 쓴다:
+#   tabular = TrimodalEvaluator: 임상·판독지 입력이 있는 모델과 영상이 묶인 joint 모델 (bs32, max 60, min epoch 20)
+#   image   = ImageOnlyEvaluator: 영상 단독 모델 (bs16, max 30, min epoch 1)
+# report: 판독지 인코더 이름(processing.report_encoder). 판독지를 쓰지 않는 모델도 RadBERT 입력 블록을 만들지만,
+#         모델이 그 블록을 읽지 않으므로 수치에는 영향이 없다.
+# PRETRAINED_IMAGE: ResNet 계열의 입력 해상도, 좌우반전 증강, 백본·head 학습률, head dropout.
+BASELINE_TAG = "baselines_v1"
+PRETRAINED_IMAGE = dict(resize=224, augment=True, backbone_lr=1e-5, head_lr=1e-3, weight_decay=1e-4, dropout=0.3)
+BASELINES = {
+    # run_nested_cv 의 두 인코더 arm. 재현 검증(--verify)에만 쓴다.
+    "clin_report":       dict(trainer="tabular", model_config="clin_report", report="radbert", verify_only=True),
+    "image_simplecnn":   dict(trainer="image", backbone="simplecnn", verify_only=True),
+    # Table 2 · 3 에 새로 채울 모델
+    "clin_only":         dict(trainer="tabular", model_config="clin_only", report="radbert"),
+    "report_tfidf":      dict(trainer="tabular", model_config="report_only", report="tfidf"),
+    "report_mbert":      dict(trainer="tabular", model_config="report_only", report="mbert"),
+    "report_kmbert":     dict(trainer="tabular", model_config="report_only", report="kmbert"),
+    "report_radbert":    dict(trainer="tabular", model_config="report_only", report="radbert"),
+    "clin_image":        dict(trainer="tabular", model_config="clin_image", report="radbert"),
+    "report_image":      dict(trainer="tabular", model_config="report_image", report="radbert"),
+    "image_resnet18":    dict(trainer="image", backbone="resnet18", **PRETRAINED_IMAGE),
+    "image_radimagenet": dict(trainer="image", backbone="radimagenet", **PRETRAINED_IMAGE),
+}
+# 판독지 인코더: 모두 frozen mean-pooling 768, 축소·표준화 없음. 한글 처리는 tokenizer 에 맞춘다:
+# RadBERT 는 영어 전용이라 ko2en 치환, mBERT·KM-BERT 는 한국어 어휘가 있어 원문을 쓴다.
+REPORT_BERT_MODELS = {"mbert": "bert-base-multilingual-cased", "kmbert": "madatnlp/km-bert"}
+
 
 # 분할·누출 검사에 실패하면 결과를 저장하지 않고 바로 멈춘다
 class GuardError(RuntimeError):

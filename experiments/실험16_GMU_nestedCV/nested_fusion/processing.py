@@ -16,7 +16,7 @@ from sclc import foldsafe_clinical as fsc
 from sclc.model import MODALITY_CONFIGS, ImageOnlyDeepSurv, make_model_factory
 from sclc.train import fold_plan
 
-from .config import ARMS
+from .config import ARMS, REPORT_BERT_MODELS
 
 
 # ── 특징 추출 ──
@@ -76,6 +76,13 @@ class TabularFeatureHook(FeatureHook):
         return {"clinical": torch.cat(ec), "report": torch.cat(et),
                 "risk": torch.cat(risk).squeeze(1), "head_risk": torch.cat(head_risk).squeeze(1),
                 "tabular": torch.as_tensor(dataset.tabular)}
+
+
+class StateHook(FeatureHook):
+    """특징은 뽑지 않고 분할 ID·가중치 해시만 남긴다 (⑥ 비교 모델용). hook 이 있어야 evaluator 가 best_epoch 을 기록한다."""
+
+    def __call__(self, fold, ids, model, datasets, device):
+        self._record(fold, ids, model, datasets)
 
 
 class ImageFeatureHook(FeatureHook):
@@ -209,3 +216,26 @@ def pool_inner_oof(inner: list[dict], t_ids) -> pd.DataFrame:
         extra = sorted(set(df["research_id"]) - set(int(i) for i in t_ids))
         raise ValueError(f"OOF 가 T_k 와 다르다 (빠짐 {missing}, 남음 {extra})")
     return df.set_index("research_id").sort_index()
+
+
+# ── ⑥ 비교 모델의 판독지 인코더 ──
+def report_encoder(name: str):
+    """판독지 인코더 이름 -> ReportEncoder. radbert·tfidf 는 sclc.encoders.build_encoder 로 만든다. mBERT·KM-BERT 는
+    RadBERT 와 같은 frozen mean-pooling 768 경로(bert_features.embed_corpus, make_text_encoder_fn)를 모델 이름만 달리해 쓴다."""
+    from sclc.encoders import RadBertReportEncoder, build_encoder
+
+    if name in ("radbert", "tfidf"):
+        return build_encoder(name)
+    if name not in REPORT_BERT_MODELS:
+        raise ValueError(f"unknown report encoder {name!r}")
+
+    class FrozenBertReportEncoder(RadBertReportEncoder):
+        model_name = REPORT_BERT_MODELS[name]
+
+        @property
+        def description(self) -> str:
+            return f"{self.model_name} frozen mean-pooling 768, 원문(한국어 어휘 있음), 축소/표준화 없음"
+
+    enc = FrozenBertReportEncoder(korean="raw")
+    enc.name = name
+    return enc
