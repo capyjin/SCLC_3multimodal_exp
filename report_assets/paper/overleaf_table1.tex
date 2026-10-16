@@ -1,0 +1,96 @@
+% Table 1 (기저 특성) — main.tex 의 기존 Table 1 블록(begingroup 부터 주석 끝 normalsize 까지)을 이것으로 바꾼다
+% 자동 생성: tools/make_paper_tables.py — 수치를 여기서 고치지 말고 스크립트를 다시 돌릴 것.
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{4pt}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{
+  >{\raggedright\arraybackslash}p{2.1in}
+  >{\centering\arraybackslash}p{1.25in}
+  >{\centering\arraybackslash}p{1.25in}
+  >{\centering\arraybackslash}p{1.25in}
+}
+\caption{Baseline characteristics of the study cohort, stratified by disease stage}
+\label{tab:baseline} \\
+\toprule
+Characteristic & Overall (N=238) & Limited stage (N=72) & Extensive stage (N=166) \\
+\midrule
+\endfirsthead
+\multicolumn{4}{l}{\small\textit{Table \thetable\ continued from previous page}} \\
+\toprule
+Characteristic & Overall (N=238) & Limited stage (N=72) & Extensive stage (N=166) \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\small\textit{Continued on next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
+Age at diagnosis, years & 70.5 [64.0--76.0] & 70.0 [63.0--75.2] & 71.0 [64.2--76.0] \\
+Smoking, pack-years\textsuperscript{a} & 43.0 [30.0--55.0] & 40.0 [35.0--50.0] & 45.0 [30.0--55.0] \\
+Hemoglobin, g/dL & 12.5 [11.6--13.9] & 12.9 [11.9--14.1] & 12.4 [11.5--13.7] \\
+White blood cell count, /\textmu L & 7700.0 [6290.0--9560.0] & 7180.0 [6307.5--8610.0] & 8000.0 [6290.0--9900.0] \\
+LDH, U/L & 522.0 [413.0--761.5] & 429.0 [358.8--570.5] & 583.0 [437.0--1032.0] \\
+FVC, \% predicted & 88.0 [76.5--99.0] & 89.5 [81.0--99.0] & 87.0 [75.0--99.0] \\
+FEV1, \% predicted & 83.5 [69.0--97.0] & 89.0 [72.0--97.0] & 81.0 [68.5--97.0] \\
+DLCO (adjusted), \% predicted & 88.0 [71.2--103.8] & 89.0 [77.5--104.8] & 87.0 [70.0--101.5] \\
+Sex & & & \\
+\quad Male & 208 (87) & 67 (93) & 141 (85) \\
+\quad Female & 30 (13) & 5 (7) & 25 (15) \\
+ECOG performance status & & & \\
+\quad 0 & 25 (11) & 9 (12) & 16 (10) \\
+\quad 1 & 184 (77) & 55 (76) & 129 (78) \\
+\quad 2 & 22 (9) & 5 (7) & 17 (10) \\
+\quad 3 & 7 (3) & 3 (4) & 4 (2) \\
+mMRC dyspnea scale & & & \\
+\quad 0 & 14 (6) & 4 (6) & 10 (6) \\
+\quad 1 & 142 (60) & 41 (57) & 101 (61) \\
+\quad 2 & 65 (27) & 22 (31) & 43 (26) \\
+\quad 3 & 13 (5) & 3 (4) & 10 (6) \\
+\quad 4 & 4 (2) & 2 (3) & 2 (1) \\
+Smoking status & & & \\
+\quad Never & 19 (8) & 5 (7) & 14 (8) \\
+\quad Former & 109 (46) & 35 (49) & 74 (45) \\
+\quad Current & 100 (42) & 31 (43) & 69 (42) \\
+\quad Unknown & 10 (4) & 1 (1) & 9 (5) \\
+Diabetes mellitus & & & \\
+\quad No & 165 (69) & 50 (69) & 115 (69) \\
+\quad Yes & 73 (31) & 22 (31) & 51 (31) \\
+Hypertension & & & \\
+\quad No & 122 (51) & 41 (57) & 81 (49) \\
+\quad Yes & 116 (49) & 31 (43) & 85 (51) \\
+History of tuberculosis & & & \\
+\quad No & 217 (91) & 66 (92) & 151 (91) \\
+\quad Yes & 20 (8) & 6 (8) & 14 (8) \\
+\quad Unknown & 1 (0) & 0 (0) & 1 (1) \\
+Chronic lung disease & & & \\
+\quad None & 140 (59) & 39 (54) & 101 (61) \\
+\quad COPD & 66 (28) & 19 (26) & 47 (28) \\
+\quad Asthma & 4 (2) & 1 (1) & 3 (2) \\
+\quad ILD/IPF & 25 (11) & 12 (17) & 13 (8) \\
+\quad COPD and ILD/IPF & 1 (0) & 1 (1) & 0 (0) \\
+\quad Unknown & 2 (1) & 0 (0) & 2 (1) \\
+Liver metastasis & & & \\
+\quad No & 185 (78) & 69 (96) & 116 (70) \\
+\quad Yes & 53 (22) & 3 (4) & 50 (30) \\
+Brain metastasis at diagnosis & & & \\
+\quad No & 190 (80) & 71 (99) & 119 (72) \\
+\quad Yes & 48 (20) & 1 (1) & 47 (28) \\
+Atezolizumab use & & & \\
+\quad No & 143 (60) & 69 (96) & 74 (45) \\
+\quad Yes & 95 (40) & 3 (4) & 92 (55) \\
+Radiotherapy type & & & \\
+\quad None & 100 (42) & 12 (17) & 88 (53) \\
+\quad CCRT & 66 (28) & 50 (69) & 16 (10) \\
+\quad Palliative RT & 40 (17) & 3 (4) & 37 (22) \\
+\quad Curative RT & 11 (5) & 6 (8) & 5 (3) \\
+\quad Not recorded & 21 (9) & 1 (1) & 20 (12) \\
+\end{longtable}
+\endgroup
+
+\vspace{-0.5\baselineskip}
+\noindent\footnotesize
+Values are median [IQR] of observed values or No.\ (\%). Missing: pack-years 4; hemoglobin 3; white blood cell count 3; LDH 39; FVC 27; FEV1 26; DLCO 52. \textsuperscript{a}Former and current smokers (n = 209). Brain metastasis, at diagnosis only. COPD = chronic obstructive pulmonary disease, CCRT = concurrent chemoradiotherapy, DLCO = diffusing capacity for carbon monoxide, ECOG = Eastern Cooperative Oncology Group, FEV1 = forced expiratory volume in 1 s, FVC = forced vital capacity, ILD/IPF = interstitial lung disease/idiopathic pulmonary fibrosis, IQR = interquartile range, LDH = lactate dehydrogenase, mMRC = modified Medical Research Council, RT = radiotherapy
+\normalsize

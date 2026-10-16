@@ -1,0 +1,46 @@
+% Table S1 (Supplementary: multivariable Cox (3.5))
+% 자동 생성: tools/make_paper_tables.py — 수치를 여기서 고치지 말고 스크립트를 다시 돌릴 것.
+% 단독 문서다(캡처용). Overleaf 새 프로젝트에서 pdfLaTeX 로 컴파일한다.
+% 기존 main.tex 에 넣을 때는 이 파일이 아니라 overleaf_tables.tex 를 쓴다.
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}l cc cc@{}}
+\toprule
+Variable & \multicolumn{2}{c}{Univariable} & \multicolumn{2}{c}{Multivariable} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+ & HR (95\% CI) & \textit{P} & HR (95\% CI) & \textit{P} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{A. Overall survival (n = 238, 199 deaths)}} \\
+\quad High-risk group (vs. low risk) & 2.32 (1.74--3.10) & $<$ 0.001 & 1.73 (1.27--2.36) & $<$ 0.001 \\
+\quad Extensive stage (vs. limited) & 2.39 (1.71--3.32) & $<$ 0.001 & 1.77 (1.23--2.54) & 0.002 \\
+\quad ECOG performance status $\geq$ 2 (vs. 0--1) & 1.42 (0.94--2.15) & 0.095 & 1.02 (0.66--1.58) & 0.921 \\
+\quad Age, per 10 years & 1.59 (1.31--1.92) & $<$ 0.001 & 1.67 (1.37--2.05) & $<$ 0.001 \\
+\quad Female sex (vs. male) & 1.08 (0.73--1.60) & 0.713 & 0.97 (0.65--1.46) & 0.896 \\
+\quad Liver metastasis & 2.70 (1.94--3.74) & $<$ 0.001 & 2.00 (1.41--2.84) & $<$ 0.001 \\
+\quad Brain metastasis at diagnosis & 1.81 (1.30--2.54) & $<$ 0.001 & 1.59 (1.11--2.26) & 0.011 \\
+\addlinespace
+\multicolumn{5}{@{}l}{\textit{B. Progression-free survival (n = 238, 212 events)}} \\
+\quad High-risk group (vs. low risk) & 2.03 (1.54--2.67) & $<$ 0.001 & 1.73 (1.29--2.33) & $<$ 0.001 \\
+\quad Extensive stage (vs. limited) & 2.09 (1.54--2.85) & $<$ 0.001 & 1.73 (1.24--2.43) & 0.001 \\
+\quad ECOG performance status $\geq$ 2 (vs. 0--1) & 1.20 (0.79--1.81) & 0.390 & 1.08 (0.70--1.66) & 0.722 \\
+\quad Age, per 10 years & 1.23 (1.03--1.46) & 0.022 & 1.17 (0.98--1.40) & 0.078 \\
+\quad Female sex (vs. male) & 1.08 (0.73--1.59) & 0.702 & 0.82 (0.54--1.24) & 0.348 \\
+\quad Liver metastasis & 2.27 (1.65--3.13) & $<$ 0.001 & 1.65 (1.17--2.34) & 0.005 \\
+\quad Brain metastasis at diagnosis & 1.85 (1.33--2.58) & $<$ 0.001 & 1.56 (1.10--2.20) & 0.012 \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Supplementary Table S1.} Univariable and Multivariable Cox Regression Analyses of the Risk Group Defined by the Proposed Model\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Risk group as in Table 5. Because the model already uses these clinical variables, the multivariable HR shows added prognostic information, not independence from them. CI = confidence interval, ECOG = Eastern Cooperative Oncology Group, HR = hazard ratio\par\fi
+\end{minipage}
+\end{document}

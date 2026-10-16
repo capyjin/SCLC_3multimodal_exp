@@ -1,0 +1,25 @@
+% --- Results 3.2–3.6 표·KM 그림용 (tools/make_paper_tables.py) ---
+\usepackage{booktabs,multirow,pifont,adjustbox}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots}
+\usetikzlibrary{calc}
+\pgfplotsset{compat=1.18}
+% low risk = green, high risk = red
+\definecolor{kmlow}{HTML}{3A9D5D}
+\definecolor{kmhigh}{HTML}{E2574C}
+% KM text is set in Times (ptm) regardless of the body font: Computer Modern 7 pt (cmr7) is wide
+% enough that the at-risk numbers run into each other. Keeps main.tex and the standalone PDF identical.
+\providecommand{\kmsmall}{\fontfamily{ptm}\fontsize{7}{8.4}\selectfont}
+\providecommand{\kmlabel}{\fontfamily{ptm}\fontsize{8}{9.6}\selectfont}
+\providecommand{\kmletter}{\fontfamily{ptm}\fontsize{10}{12}\selectfont\bfseries}
+\tikzset{
+  kmlowline/.style={color=kmlow, line width=1pt},
+  kmhighline/.style={color=kmhigh, line width=1pt}}
+\pgfplotsset{
+  kmaxis/.style={
+    scale only axis, width=56.3mm, height=40mm, xmin=0, ymin=0, ymax=1.02,
+    ytick={0,0.2,0.4,0.6,0.8,1}, yticklabel style={/pgf/number format/.cd, fixed, fixed zerofill, precision=1},
+    xticklabel style={/pgf/number format/1000 sep={}},
+    xlabel={Time (days)}, ylabel={Survival probability}, axis lines=left, axis line style={-},
+    tick align=outside, clip=false, tick label style={font=\kmsmall}, label style={font=\kmlabel},
+    title style={font=\kmlabel, align=center, yshift=0.5mm}}}

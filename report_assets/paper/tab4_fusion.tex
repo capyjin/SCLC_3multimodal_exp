@@ -1,0 +1,41 @@
+% Table 4 (3.4 Fusion method comparison)
+% 자동 생성: tools/make_paper_tables.py — 수치를 여기서 고치지 말고 스크립트를 다시 돌릴 것.
+% 단독 문서다(캡처용). Overleaf 새 프로젝트에서 pdfLaTeX 로 컴파일한다.
+% 기존 main.tex 에 넣을 때는 이 파일이 아니라 overleaf_tables.tex 를 쓴다.
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}ll cc cc@{}}
+\toprule
+Fusion strategy & Component models & \multicolumn{2}{c}{OS} & \multicolumn{2}{c}{PFS} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+ & & C-index & \textit{P} & C-index & \textit{P} \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{A. Level of fusion}} \\
+\quad Early fusion & [C + R + I] & 0.688 $\pm$ 0.054 & 0.100 & 0.655 $\pm$ 0.048 & 0.661 \\
+\quad Late fusion, three-way & C, R, I & 0.705 $\pm$ 0.039 & 0.036 & 0.655 $\pm$ 0.028 & 0.164 \\
+\quad Late fusion, two-way (proposed) & [C + R], I & 0.722 $\pm$ 0.033 & Reference & 0.647 $\pm$ 0.029 & Reference \\
+\addlinespace
+\multicolumn{6}{@{}l}{\textit{B. Grouping of modalities in two-way late fusion}} \\
+\quad Late fusion, two-way & [C + I], R & 0.689 $\pm$ 0.034 & 0.010 & 0.645 $\pm$ 0.041 & 0.875 \\
+\quad Late fusion, two-way & [R + I], C & 0.673 $\pm$ 0.047 & 0.046 & 0.641 $\pm$ 0.038 & 0.788 \\
+\addlinespace
+\multicolumn{6}{@{}l}{\textit{C. Adaptive fusion}} \\
+\quad Attention fusion\textsuperscript{a} & [C + R + I] & 0.712 $\pm$ 0.037 & 0.525 & 0.648 $\pm$ 0.062 & 0.978 \\
+\quad Gated fusion\textsuperscript{b} & [C + R], I & 0.723 $\pm$ 0.033 & 0.178 & 0.650 $\pm$ 0.026 & 0.357 \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Table 4.} Comparison of Fusion Strategies\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Mean $\pm$ SD of the C-index across the five test folds (n = 238); \textit{P}, paired \textit{t} test versus the proposed model. Brackets, modalities trained jointly in one model. \textsuperscript{a}Modality features combined by self-attention. \textsuperscript{b}Cox weights multiplied by patient-specific gates (from the two risk scores); identical to the proposed model when the gate parameters are zero. Inner cross-validation turned the gates practically off in 3 of 5 folds (OS) and 2 of 5 (PFS). C = clinical variables, I = PET-CT image, OS = overall survival, PFS = progression-free survival, R = radiology report, SD = standard deviation\par\fi
+\end{minipage}
+\end{document}

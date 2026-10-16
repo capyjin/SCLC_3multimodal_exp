@@ -1,0 +1,34 @@
+% Table 3 (3.3 Multimodal performance)
+% 자동 생성: tools/make_paper_tables.py — 수치를 여기서 고치지 말고 스크립트를 다시 돌릴 것.
+% 단독 문서다(캡처용). Overleaf 새 프로젝트에서 pdfLaTeX 로 컴파일한다.
+% 기존 main.tex 에 넣을 때는 이 파일이 아니라 overleaf_tables.tex 를 쓴다.
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}cccl cc cc@{}}
+\toprule
+Clinical & Report & Image & Model & \multicolumn{2}{c}{OS} & \multicolumn{2}{c}{PFS} \\
+\cmidrule(lr){5-6}\cmidrule(l){7-8}
+ & & & & C-index & \textit{P} & C-index & \textit{P} \\
+\midrule
+\ding{51} & \ding{51} &  & Joint (concatenation) & 0.715 $\pm$ 0.025 & 0.321 & 0.646 $\pm$ 0.019 & 0.883 \\
+\ding{51} &  & \ding{51} & Joint (concatenation) & 0.671 $\pm$ 0.028 & 0.011 & 0.627 $\pm$ 0.032 & 0.065 \\
+ & \ding{51} & \ding{51} & Joint (concatenation) & 0.666 $\pm$ 0.053 & 0.019 & 0.628 $\pm$ 0.045 & 0.406 \\
+\addlinespace
+\ding{51} & \ding{51} & \ding{51} & Proposed (late fusion) & 0.722 $\pm$ 0.033 & Reference & 0.647 $\pm$ 0.029 & Reference \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Table 3.} Prognostic Performance According to the Combination of Modalities\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Mean $\pm$ SD of the C-index across the five test folds (n = 238); \textit{P}, paired \textit{t} test versus the proposed model. Joint, one end-to-end model on concatenated features; proposed, late fusion of the clinical--report model and the image model. OS = overall survival, PFS = progression-free survival, SD = standard deviation\par\fi
+\end{minipage}
+\end{document}
