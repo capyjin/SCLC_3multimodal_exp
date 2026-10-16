@@ -1,0 +1,117 @@
+% !TEX program = xelatex
+% 기존 gated fusion(실험11 MoE 게이트) 실패 이유 — PPT 슬라이드 한 장 (16:9, 쉬운 표현).
+% 수치 출처: outputs/moe_gate_m0_radbert/results.json (M0 OS Δ −0.0238),
+%            archive/before-cleanup-2026-09-30:experiments/실험11_MoE/RESULTS_ALL.md (M1 −0.1185, M0-tuned RadBERT −0.0029),
+%            outputs/gmu_nested/gated_nested/results.json (실험16 E1 − A = +0.0014).
+\documentclass[tikz,border=0pt]{standalone}
+\usepackage{fontspec}
+\setmainfont{Noto Sans CJK KR}
+\setsansfont{Noto Sans CJK KR}
+\usepackage{amsmath}
+\usetikzlibrary{calc,arrows.meta,decorations.pathmorphing}
+
+\definecolor{navy}{HTML}{2F3B52}
+\definecolor{ink}{HTML}{1A1A1A}
+\definecolor{ink2}{HTML}{5A5E66}
+\definecolor{bad}{HTML}{C9545C}
+\definecolor{badlight}{HTML}{F6CDD0}
+\definecolor{good}{HTML}{3E6FB0}
+\definecolor{goodlight}{HTML}{CFE0F7}
+\definecolor{boxyellow}{HTML}{FDEEB8}
+\definecolor{bg}{HTML}{FAFAF7}
+
+\tikzset{
+  every node/.style={text=ink},
+  arr/.style={-{Latex[length=2.4mm,width=1.9mm]}, draw=navy, line width=0.9pt},
+}
+
+% 이유 카드: \card{x중심}{번호}{제목}{본문}{결과}
+\newcommand{\card}[5]{%
+  \begin{scope}[shift={(#1,9.55)}]
+    \fill[white, rounded corners=6pt] (-3.85,-2.15) rectangle (3.85,2.15);
+    \draw[navy!60, line width=0.7pt, rounded corners=6pt] (-3.85,-2.15) rectangle (3.85,2.15);
+    \fill[badlight, rounded corners=6pt] (-3.85,1.15) rectangle (3.85,2.15);
+    \fill[badlight] (-3.85,1.15) rectangle (3.85,1.5);
+    \node[circle, fill=bad, text=white, font=\bfseries, minimum size=7mm, inner sep=0pt] at (-3.25,1.65) {#2};
+    \node[anchor=west, font=\large\bfseries] at (-2.75,1.65) {#3};
+    \node[anchor=north west, text width=7.1cm, align=left, font=\normalsize, inner sep=0pt] at (-3.55,0.85) {#4};
+    \node[anchor=south west, text width=7.1cm, align=left, font=\normalsize\bfseries, text=bad, inner sep=0pt] at (-3.55,-1.9) {#5};
+  \end{scope}%
+}
+
+\begin{document}
+\begin{tikzpicture}[x=1cm,y=1cm]
+\fill[bg] (0,0) rectangle (25.4,14.29);
+
+% ---------------- 제목 ----------------
+\node[anchor=west, font=\huge\bfseries] at (0.7,13.35) {기존 gated fusion(실험11)이 실패한 이유};
+\node[anchor=west, font=\normalsize, text=ink2] at (0.75,12.45)
+  {게이트 = 환자마다 영상 · 임상 점수를 섞는 비율을 다르게 정해 주는 장치};
+
+% ---------------- 이유 카드 3개 ----------------
+\card{4.55}{1}{게이트가 너무 복잡함}
+  {• 학습 환자: fold당 171명\\ • 게이트 입력: 24차원\\ \phantom{• }(M1은 학습할 값 약 1.1만 개)}
+  {→ 환자 수에 비해 배울 게 너무 많음}
+\card{12.7}{2}{규제가 약함}
+  {• weight decay 0.01로 고정\\ • 게이트 값이 환자마다 크게 흔들림}
+  {→ 시험 환자에서는 오히려 성능 하락}
+\card{20.85}{3}{게이트가 배울 신호가 약함}
+  {• 데이터 나누는 방식만 바꿔도\\ \phantom{• }가장 좋은 설정이 매번 바뀜\\ • 병기 · 나이를 넣어도 개선 없음}
+  {→ 환자마다 다르게 섞을 근거 부족}
+
+% ---------------- 막대그래프 ----------------
+\begin{scope}[shift={(0.7,0.55)}]
+  \fill[white, rounded corners=6pt] (0,0) rectangle (14.1,6.2);
+  \draw[navy!60, line width=0.7pt, rounded corners=6pt] (0,0) rectangle (14.1,6.2);
+  \node[anchor=west, font=\large\bfseries] at (0.35,5.6) {게이트가 단순할수록 late fusion에 가까워짐};
+  \node[anchor=west, font=\small, text=ink2] at (0.35,5.0) {OS 기준, 게이트를 넣었을 때 C-index 변화 (0 = 기준 모델과 같음)};
+
+  \def\z{11.6}   % 0 위치
+  \def\s{170}    % C-index 0.01 = 1.7 cm
+  \draw[navy!25, line width=0.4pt, dashed] ({\z-0.01*\s},0.55) -- ({\z-0.01*\s},4.45);
+  \draw[navy!25, line width=0.4pt, dashed] ({\z-0.02*\s},0.55) -- ({\z-0.02*\s},4.45);
+  \node[font=\scriptsize, text=ink2] at ({\z-0.01*\s},0.35) {$-$0.01};
+  \node[font=\scriptsize, text=ink2] at ({\z-0.02*\s},0.35) {$-$0.02};
+  \node[font=\scriptsize, text=ink2] at (\z,0.35) {0};
+
+  % 행: 이름 / 막대
+  \foreach \y/\name/\sub in {3.95/M1/attention 게이트, 2.95/M0/PCA 24차원 입력, 1.95/M0-tuned/입력 줄이고 규제 탐색, 0.95/이번 실험16/위험점수 2개 + 강한 규제} {
+    \node[anchor=east, font=\normalsize\bfseries] at (5.55,{\y+0.13}) {\name};
+    \node[anchor=east, font=\scriptsize, text=ink2] at (5.55,{\y-0.25}) {\sub};
+  }
+  % M1: −0.12 (축 밖으로 잘라서 표시)
+  \fill[bad] (\z,3.67) rectangle (5.9,4.23);
+  \draw[bg, line width=2.2pt] (6.55,3.6) -- (6.75,4.3);
+  \draw[bg, line width=2.2pt] (6.85,3.6) -- (7.05,4.3);
+  \node[font=\small\bfseries, text=white] at (8.6,3.95) {$-$0.12 (1 fold)};
+  % M0
+  \fill[bad] (\z,2.67) rectangle ({\z-0.0238*\s},3.23);
+  \node[anchor=east, font=\small\bfseries, text=bad] at ({\z-0.0238*\s-0.05},2.95) {$-$0.024};
+  % M0-tuned
+  \fill[bad!55] (\z,1.67) rectangle ({\z-0.0029*\s},2.23);
+  \node[anchor=east, font=\small\bfseries, text=bad] at ({\z-0.0029*\s-0.05},1.95) {$-$0.003};
+  % 실험16
+  \fill[good] (\z,0.67) rectangle ({\z+0.0014*\s},1.23);
+  \node[anchor=west, font=\small\bfseries, text=good] at ({\z+0.0014*\s+0.08},0.95) {+0.001};
+  % 0 선
+  \draw[navy, line width=1pt] (\z,0.55) -- (\z,4.45);
+\end{scope}
+
+% ---------------- 정리 ----------------
+\begin{scope}[shift={(15.4,0.55)}]
+  \fill[boxyellow!70, rounded corners=6pt] (0,0) rectangle (9.3,6.2);
+  \draw[navy!60, line width=0.7pt, rounded corners=6pt] (0,0) rectangle (9.3,6.2);
+  \node[anchor=west, font=\large\bfseries] at (0.4,5.6) {정리};
+  \node[anchor=north west, text width=8.5cm, align=left, font=\normalsize, inner sep=0pt] at (0.4,4.95)
+    {이번 실험에서 바꾼 점\\[3pt]
+     • 게이트 입력을 \textbf{위험점수 2개}로 줄임\\[2pt]
+     • 필요 없으면 게이트가 \textbf{꺼지도록} 규제를 강하게 줌};
+  \draw[arr] (4.65,2.75) -- (4.65,2.25);
+  \node[anchor=north west, text width=8.5cm, align=left, font=\normalsize, inner sep=0pt] at (0.4,2.05)
+    {• 성능 하락은 \textbf{없어짐}\\[2pt]
+     • 하지만 late fusion보다 \textbf{좋아지지도 않음}\\
+     \phantom{• }{\small\color{ink2}(OS 0.725 vs 0.723, PFS 0.674 vs 0.674)}};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

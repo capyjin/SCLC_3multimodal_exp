@@ -1,0 +1,82 @@
+% 실험16 E — Gated Late Fusion (위험점수 수준 gate, fig1_late_fusion_overview 레이아웃을 따름).
+%   Left  : Gated Cox combiner 내부 (z_tab, z_img -> gate g_m = 2 sigma(c_m . z) -> risk = sum beta_m g_m z_m)
+%   Right : 전체 모델 (Stage 1 두 arm 독립 학습 -> z-score -> Stage 2 gated stacking on inner OOF)
+% 수치 출처: experiments/실험16_GMU_nestedCV/nested_fusion/{model.py (GatedLateFusion), config.py (GATED_LATE_LAMBDAS, ENCODERS)},
+%            outputs/gmu_nested/run_v2_os/experiment_config.json (임상 19변수: rt_type·atezolizumab 제외).
+\documentclass[tikz,border=6pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[x=1cm,y=1cm]
+
+% ===================== LEFT: gated Cox combiner (detail) =====================
+\begin{scope}[shift={(0,0)}]
+  % inputs: standardised risk scores
+  \node[inp=boxpurple] (zt) at (0,0)   {$z_{\text{tab}}$\\[-1pt]{\scriptsize tabular arm}};
+  \node[inp=boxblue]   (zi) at (4.4,0) {$z_{\text{img}}$\\[-1pt]{\scriptsize image arm}};
+  % gate
+  \node[blk, minimum width=31mm, minimum height=11mm] (gt) at (2.2,1.65)
+        {\textbf{Patient-wise gate}\\[1pt] $g_m(z)=2\,\sigma(c_m^{\top}z)$\\ {\scriptsize $z=[z_{\text{tab}},z_{\text{img}}]$, $c_m\in\mathbb{R}^2$}};
+  % multiply
+  \node[op] (mt) at (0,2.95)   {$\times$};
+  \node[op] (mi) at (4.4,2.95) {$\times$};
+  % combiner
+  \node[blk=boxyellow, minimum width=60mm, minimum height=7mm] (cb) at (2.2,3.9)
+        {$\text{risk}=\beta_{\text{tab}}\,g_{\text{tab}}\,z_{\text{tab}}+\beta_{\text{img}}\,g_{\text{img}}\,z_{\text{img}}$};
+  \node[risk] (r) at (2.2,4.75) {$r_{\text{gated}}$};
+  % arrows: z -> multiply (straight), z -> gate (tap)
+  \draw[arr] (zt) -- (mt);  \draw[arr] (zi) -- (mi);
+  \fill[navy] (0,0.75) circle (1.3pt);  \fill[navy] (4.4,0.75) circle (1.3pt);
+  \draw[arr] (0,0.75) -| ($(gt.south)+(-0.6,0)$);
+  \draw[arr] (4.4,0.75) -| ($(gt.south)+(0.6,0)$);
+  % gate -> multiply
+  \draw[navy, line width=0.75pt] (gt.north) -- (2.2,2.95);
+  \fill[navy] (2.2,2.95) circle (1.3pt);
+  \draw[arr] (2.2,2.95) -- node[lab, above] {$g_{\text{tab}}$} (mt.east);
+  \draw[arr] (2.2,2.95) -- node[lab, above] {$g_{\text{img}}$} (mi.west);
+  \draw[arr] (mt.north) -- (mt.north |- cb.south);
+  \draw[arr] (mi.north) -- (mi.north |- cb.south);
+  \draw[arr] (cb) -- (r);
+  % container
+  \begin{scope}[on background layer]
+    \node[container, fit={(gt)(mt)(mi)(cb)(-1.25,0.75)(5.3,0.75)}] (gc) {};
+  \end{scope}
+  \node[font=\footnotesize\bfseries, fill=white, inner sep=2pt, anchor=west]
+        at ($(gc.north west)+(0.3,0)$) {Gated Cox combiner};
+  \node[lab] at (2.2,-0.8) {$c_m=0\;\Rightarrow\;g_m=1\;\Rightarrow$ ordinary late fusion $\beta_{\text{tab}}z_{\text{tab}}+\beta_{\text{img}}z_{\text{img}}$};
+  \node[lab] at (2.2,-1.15) {fit: Efron Cox loss $+\,\lambda\lVert C\rVert^2$, L-BFGS, 6 parameters ($\beta$: 2, $C$: $2\times2$)};
+  \node[lab] at (2.2,-1.5) {$\lambda\in\{0.01,0.1,1,10,100\}$ by inner 4-fold CV; large $\lambda$ switches the gate off};
+\end{scope}
+
+% ===================== RIGHT: full model =====================
+\begin{scope}[shift={(8.6,0)}]
+  % inputs
+  \node[inp=boxblue]   (im) at (0,0)    {PET-CT MIP\\[-1pt]{\scriptsize $512\times512$, gray}};
+  \node[inp=boxpurple] (cl) at (3.15,0) {Clinical\\[-1pt]{\scriptsize 19 variables}};
+  \node[inp=boxpink]   (rp) at (4.95,0) {Report\\[-1pt]{\scriptsize text}};
+  % arms (Stage 1)
+  \node[blk, minimum width=30mm, minimum height=17mm] (ia) at (0,2.0)
+        {\textbf{Image arm}\\[1pt] {\scriptsize SimpleCNN, from scratch}\\ {\scriptsize $4\times$[Conv--BN--ReLU--Pool]}\\ {\scriptsize $\to$ GAP $\to$ FC 512 $\to$ Cox head}\\[1pt] {\scriptsize\color{ink2} batch 16 $\cdot$ $\le$30 epochs}};
+  \node[blk, minimum width=32mm, minimum height=17mm] (ta) at (4.05,2.0)
+        {\textbf{Tabular arm}\\[1pt] {\scriptsize clinical MLP $\oplus$ RadBERT--MLP}\\ {\scriptsize $\to$ Cox head}\\ {\scriptsize (same as late fusion)}\\[1pt] {\scriptsize\color{ink2} batch 32 $\cdot$ $\le$60 epochs}};
+  % standardised risk scores
+  \node[risk] (zi) at (0,3.35)    {$r_{\text{img}}\!\to\! z_{\text{img}}$};
+  \node[risk] (zt) at (4.05,3.35) {$r_{\text{tab}}\!\to\! z_{\text{tab}}$};
+  % Stage separator
+  \draw[dashed, ink2, line width=0.4pt] (-1.85,3.95) -- (5.75,3.95);
+  \node[stage, rotate=90, anchor=east] at (-2.15,3.75) {Stage 1: independent arm training};
+  \node[stage, rotate=90, anchor=west] at (-2.15,4.15) {Stage 2: gated stacking};
+  % combiner (Stage 2)
+  \node[blk=boxyellow, minimum width=62mm, minimum height=10mm] (cb) at (2.0,4.75)
+        {\textbf{Gated Cox combiner} {\scriptsize(detail: left; fitted on inner OOF)}\\ $\text{risk}=\sum_m\beta_m\,g_m(z)\,z_m$};
+  \node[risk] (out) at (2.0,5.75) {Risk score (OS / PFS)};
+  % arrows
+  \draw[arr] (im) -- (ia);  \draw[arr] (cl) -- (cl |- ta.south);  \draw[arr] (rp) -- (rp |- ta.south);
+  \draw[arr] (ia) -- (zi);  \draw[arr] (ta) -- (zt);
+  \draw[arr] (zi.north) -- (zi.north |- cb.south);
+  \draw[arr] (zt.north) -- (zt.north |- cb.south);
+  \draw[arr] (cb) -- (out);
+  \node[lab] at (2.0,-0.8) {$z_m=(r_m-\mu_m)/\sigma_m$, with $\mu_m,\sigma_m$ from training patients only};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}
