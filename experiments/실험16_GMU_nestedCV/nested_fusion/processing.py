@@ -118,10 +118,11 @@ class CheckpointRebuilder:
     def _samples(self, frame):
         return ds.preprocess_data(cohort.DEFAULT_IMAGE_DIR, frame.reset_index(), self.target, True)
 
-    def tabular(self, split_csv, ckpt_dir, extra_ids):
+    def tabular(self, split_csv, ckpt_dir, extra_ids, audit: list | None = None):
+        """``audit`` 를 주면 fold-safe 결측 대치 기록(학습 환자 중앙값 등)을 학습 때 manifest 와 같은 형식으로 남긴다."""
         cdf, clin = self._frames(split_csv)
         std_cols, cat_cols = fsc.baseline_clinical_columns(clin)
-        extra_fn = fsc.make_extra_numeric_fn(self.ctx["raw"], [])
+        extra_fn = fsc.make_extra_numeric_fn(self.ctx["raw"], [] if audit is None else audit)
         cols = [c for c in cdf.columns if c != "research_id"]
         extra_frame = self.full.loc[extra_ids, cols] if extra_ids else None
         store = {}

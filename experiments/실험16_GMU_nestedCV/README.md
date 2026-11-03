@@ -22,6 +22,7 @@ nested CV 안에서 학습하고, 두 인코더의 출력을 다섯 가지 방�
 ├── analyze_gmu_linear_part.py      ⑤ GMU 선형 부분 (사후) → outputs/gmu_nested/linear_projection_train_only/
 ├── run_baselines.py                ⑥ 비교 모델 (논문 Table 2·3) → outputs/gmu_nested/baselines_v1_{os,pfs}/
 ├── make_nested_tables.py           ⑦ Table 2·3 LaTeX        → report_assets/paper/tab{2,3}_*_nested.tex
+├── analyze_complementary_gate.py   ⑧ Complementary gate (사후, 재실행 기준) → outputs/gmu_nested/complementary_gate/
 │
 └── diagnostics/                    ← 학습 전·후 점검 (결과 아님, 재현 기록용)
     ├── checklist.py                PASS/FAIL 기록 공통 코드
@@ -65,6 +66,11 @@ nested CV 안에서 학습하고, 두 인코더의 출력을 다섯 가지 방�
 Gated Late Fusion 은 본 결과를 확인한 뒤 추가한 **탐색적 실험**이다. 인코더를 다시 학습하지 않고 `run_v2` 체크포인트로
 위험점수를 재구성해 Late Fusion 과 같은 입력에 gate 를 얹고 결합계수 b 와 gate 계수 c 를 함께 학습한다.
 (b 를 Late Fusion 계수로 고정하고 c 만 학습하는 대조 실험은 채택하지 않아 코드에서 뺐다 — OS 0.723 / PFS 0.674.)
+
+⑧ 은 지도교수 질문(2026-11-03)으로 추가한 사후 비교다. 일반적인 complementary gate `r = g·z_img + (1−g)·z_tab`,
+`g = σ(cᵀz)` (bias·결합계수 없음, `model.ComplementaryGateFusion`)를 Late Fusion·Gated Late Fusion 과 같은 입력·손실·λ 선택
+규칙으로 비교한다. 점수는 재실행(`arms_rerun_{os,pfs}`) 체크포인트로 재구성하므로 위 표(run_v2)와 수치가 다르다.
+재구성은 학습 당시 manifest(환자 분할·가중치 해시·영상 정규화·결측 대치 중앙값)와 대조하고 통과해야 저장한다.
 
 ⑤ 도 사후 탐색적 분석이다. GMU 최종 위험점수를 T_k 에서만 `r_D = a·z_tab + b·z_img + c` 로 OLS 회귀(레이블 미사용)하고,
 고정 계수로 O_k 의 선형 부분만 남겼을 때의 C-index 를 잰다(잔차 제거). 체크포인트 재구성, 재학습 없음.

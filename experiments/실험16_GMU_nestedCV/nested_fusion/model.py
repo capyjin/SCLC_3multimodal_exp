@@ -244,3 +244,34 @@ class GatedLateFusion:
         g = g.numpy()
         return {arm: {"mean": float(g[:, i].mean()), "sd": float(g[:, i].std(ddof=1)),
                       "min": float(g[:, i].min()), "max": float(g[:, i].max())} for i, arm in enumerate(ARMS)}
+
+
+class ComplementaryGateFusion(GatedLateFusion):
+    """Complementary gate (지도교수 질문의 일반형): r = g · z_img + (1 − g) · z_tab,  g = σ(cᵀz),  c ∈ R².
+    gate bias 와 결합계수가 없다. c = 0 이면 g = 0.5 (두 z 의 단순 평균). 손실(Efron + λ‖c‖²)·λ 후보·선택 규칙은
+    GatedLateFusion 과 같다 (select_lambda 를 그대로 물려받는다). 돌려주는 가중치는 ARMS 순서 [1 − g, g]."""
+
+    @staticmethod
+    def forward(c, Z):
+        g = torch.sigmoid(Z @ c)
+        return g * Z[:, 1] + (1.0 - g) * Z[:, 0], torch.stack([1.0 - g, g], dim=1)
+
+    def predict(self, Z):
+        """-> (위험점수, [tabular 가중치 1 − g, image 가중치 g])"""
+        return self.forward(self.C, Z)
+
+    def fit(self, Z, t, e) -> "ComplementaryGateFusion":
+        c = torch.zeros(Z.shape[1], dtype=F64, requires_grad=True)
+        opt = torch.optim.LBFGS([c], lr=1.0, max_iter=500, tolerance_grad=1e-10, tolerance_change=1e-12,
+                                line_search_fn="strong_wolfe")
+
+        def closure():
+            opt.zero_grad()
+            r, _ = self.forward(c, Z)
+            loss = cox_efron_loss(r, t, e) + self.lam * (c ** 2).sum()
+            loss.backward()
+            return loss
+
+        opt.step(closure)
+        self.C = c.detach()
+        return self
