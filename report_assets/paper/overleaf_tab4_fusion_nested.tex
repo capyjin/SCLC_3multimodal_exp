@@ -1,0 +1,27 @@
+% ===== 3.4 Fusion method comparison (nested CV) =====
+\begin{table}[htbp]
+\centering
+\setlength{\belowcaptionskip}{4pt}
+\caption{Comparison of Fusion Strategies}
+\label{tab:fusion}
+\small\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{@{}ll cc cc@{}}
+\toprule
+Fusion strategy & Fusion level & \multicolumn{2}{c}{OS} & \multicolumn{2}{c}{PFS} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+ & & C-index & $\Delta$C-index & C-index & $\Delta$C-index \\
+\midrule
+Early fusion & Feature & 0.712 $\pm$ 0.048 & $+0.013$ & 0.666 $\pm$ 0.047 & $+0.008$ \\
+GMU & Feature & 0.712 $\pm$ 0.037 & $+0.013$ & 0.665 $\pm$ 0.040 & $+0.009$ \\
+\addlinespace
+Late fusion & Risk score & 0.723 $\pm$ 0.026 & $+0.001$ & 0.674 $\pm$ 0.026 & 0.000 \\
+Gated late fusion (proposed) & Risk score & \textbf{0.725 $\pm$ 0.028} & -- & \textbf{0.674 $\pm$ 0.026} & -- \\
+\bottomrule
+\end{tabular}%
+\end{adjustbox}
+\par\smallskip
+\begin{minipage}{\textwidth}\footnotesize
+Mean $\pm$ SD (sample SD) of the C-index across the five outer test folds of nested cross-validation (n = 238). $\Delta$C-index $= C_{\mathrm{fusion}} - C_{m}$, where $C_{m}$ is the C-index of model $m$ and $C_{\mathrm{fusion}}$ that of the proposed model in the same outer test fold, averaged over the five folds. All strategies combine the same clinical--report encoder and image encoder trained within each outer training set. Fusion level, the stage at which the two encoders are combined: feature, encoder features are combined and a Cox layer is trained on top (hyperparameters selected in the inner folds); risk score, the two encoder risk scores are combined by a Cox model fitted to inner out-of-fold scores. GMU, encoder features weighted by patient-specific modality gates. Gated late fusion, late-fusion coefficients multiplied by patient-specific gates computed from the two risk scores; identical to late fusion when the gate parameters are zero. Inner cross-validation turned the gates practically off in 2 of 5 folds for both OS and PFS. GMU = gated multimodal unit, OS = overall survival, PFS = progression-free survival, SD = standard deviation
+\end{minipage}
+\end{table}

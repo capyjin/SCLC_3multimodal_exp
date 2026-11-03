@@ -1,0 +1,38 @@
+% Table 3 (3.3 Multimodal performance)
+% 자동 생성: 실험16 nested CV (baselines_v1 · arms_rerun · 실험16 문서의 융합 fold 값).
+% 단독 문서다(캡처용). Overleaf 새 프로젝트에서 pdfLaTeX 로 컴파일한다.
+
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}cccl cc cc@{}}
+\toprule
+Clinical & Report & Image & Model & \multicolumn{2}{c}{OS} & \multicolumn{2}{c}{PFS} \\
+\cmidrule(lr){5-6}\cmidrule(l){7-8}
+ & & & & C-index & $\Delta$C-index & C-index & $\Delta$C-index \\
+\midrule
+\ding{51} &  &  & Unimodal & 0.668 $\pm$ 0.031 & $+0.056$ & 0.625 $\pm$ 0.038 & $+0.048$ \\
+ & \ding{51} &  & Unimodal & 0.661 $\pm$ 0.040 & $+0.063$ & 0.634 $\pm$ 0.046 & $+0.039$ \\
+ &  & \ding{51} & Unimodal & 0.654 $\pm$ 0.061 & $+0.071$ & 0.618 $\pm$ 0.052 & $+0.056$ \\
+\addlinespace
+\ding{51} & \ding{51} &  & Joint (concatenation) & 0.715 $\pm$ 0.022 & $+0.009$ & 0.673 $\pm$ 0.022 & $+0.001$ \\
+\ding{51} &  & \ding{51} & Joint (concatenation) & 0.683 $\pm$ 0.061 & $+0.042$ & 0.624 $\pm$ 0.050 & $+0.050$ \\
+ & \ding{51} & \ding{51} & Joint (concatenation) & 0.665 $\pm$ 0.046 & $+0.060$ & 0.628 $\pm$ 0.051 & $+0.046$ \\
+\addlinespace
+\ding{51} & \ding{51} & \ding{51} & Hybrid fusion (proposed) & \textbf{0.725 $\pm$ 0.028} & -- & \textbf{0.674 $\pm$ 0.026} & -- \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Table 3.} Prognostic Performance According to the Combination of Modalities\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Mean $\pm$ SD (sample SD) of the C-index across the five outer test folds of nested cross-validation (n = 238). $\Delta$C-index $= C_{\mathrm{fusion}} - C_{m}$, where $C_{m}$ is the C-index of model $m$ and $C_{\mathrm{fusion}}$ that of the proposed model in the same outer test fold, averaged over the five folds. Unimodal, MLP for clinical variables, RadBERT for the report and Simple CNN for the image. Joint, one end-to-end model on concatenated features. Hybrid fusion (proposed), two-way gated late fusion of the clinical--report model and the image model (Table 4). OS = overall survival, PFS = progression-free survival, SD = standard deviation\par\fi
+\end{minipage}
+\end{document}

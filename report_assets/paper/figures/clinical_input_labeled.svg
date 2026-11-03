@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="658" height="280" viewBox="0 0 658 280">
+<rect x="10" y="110" width="30" height="70" fill="#b9a3d6" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="40" y="110" width="30" height="70" fill="#e4dbef" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="70" y="110" width="30" height="70" fill="#cbbbe2" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="100" y="110" width="30" height="70" fill="#efe9f6" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="130" y="110" width="30" height="70" fill="#bfaada" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="160" y="110" width="30" height="70" fill="#d9cceb" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="190" y="110" width="30" height="70" fill="#a98fce" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="220" y="110" width="30" height="70" fill="#e9e1f3" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="268" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="298" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="328" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="358" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="388" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="418" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="448" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="478" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="508" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="538" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="568" y="110" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<text x="25.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 25.0 104.0)">Age</text>
+<text x="55.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 55.0 104.0)">Pack-years</text>
+<text x="85.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 85.0 104.0)">Hb</text>
+<text x="115.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 115.0 104.0)">WBC</text>
+<text x="145.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 145.0 104.0)">LDH</text>
+<text x="175.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 175.0 104.0)">FVC</text>
+<text x="205.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 205.0 104.0)">FEV1</text>
+<text x="235.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 235.0 104.0)">DLCO</text>
+<text x="283.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 283.0 104.0)">Sex</text>
+<text x="313.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 313.0 104.0)">ECOG</text>
+<text x="343.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 343.0 104.0)">mMRC</text>
+<text x="373.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 373.0 104.0)">Smoking</text>
+<text x="403.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 403.0 104.0)">DM</text>
+<text x="433.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 433.0 104.0)">HTN</text>
+<text x="463.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 463.0 104.0)">TB</text>
+<text x="493.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 493.0 104.0)">Lung disease</text>
+<text x="523.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 523.0 104.0)">Stage</text>
+<text x="553.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 553.0 104.0)">Liver mets</text>
+<text x="583.0" y="104.0" font-family="Times New Roman" font-size="12" fill="#000" font-weight="normal" text-anchor="start" transform="rotate(-55 583.0 104.0)">Brain mets</text>
+<path d="M10 190 V200 H250 V190" fill="none" stroke="#999" stroke-width="1.2"/>
+<text x="130.0" y="226.0" font-family="Times New Roman" font-size="18" fill="#000" font-weight="normal" text-anchor="middle">8 continuous</text>
+<path d="M268 190 V200 H598 V190" fill="none" stroke="#999" stroke-width="1.2"/>
+<text x="433.0" y="226.0" font-family="Times New Roman" font-size="18" fill="#000" font-weight="normal" text-anchor="middle">11 categorical</text>
+<text x="292.0" y="268.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="bold" text-anchor="end">x</text>
+<text x="304.0" y="268.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="normal" text-anchor="middle">∈</text>
+<text x="316.0" y="268.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="normal" text-anchor="start">ℝ</text>
+<text x="334.0" y="257.0" font-family="Times New Roman" font-size="15" fill="#000" font-weight="normal" text-anchor="start">19</text>
+</svg>

@@ -1,0 +1,50 @@
+% Table 6 (3.6 Subgroup analysis)
+% 자동 생성: nested CV Gated late fusion outer test 위험점수 (km_nested).
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}lc ccc ccc@{}}
+\toprule
+Subgroup & Patients & \multicolumn{3}{c}{OS} & \multicolumn{3}{c}{PFS} \\
+\cmidrule(lr){3-5}\cmidrule(l){6-8}
+ & & C-index (95\% CI) & HR (95\% CI) & \textit{P}\textsubscript{int} & C-index (95\% CI) & HR (95\% CI) & \textit{P}\textsubscript{int} \\
+\midrule
+All patients & 238 & 0.724 (0.685--0.762) & 2.83 (2.12--3.79) & & 0.672 (0.632--0.710) & 2.54 (1.92--3.36) & \\
+\addlinespace
+Age & & & & 0.747 & & & 0.023 \\
+\quad $<$ 70 years & 111 & 0.699 (0.626--0.764) & 2.73 (1.78--4.20) & & 0.626 (0.553--0.699) & 1.84 (1.22--2.77) & \\
+\quad $\geq$ 70 years & 127 & 0.738 (0.681--0.789) & 2.69 (1.81--4.01) & & 0.709 (0.649--0.762) & 3.41 (2.26--5.14) & \\
+Sex & & & & 0.017 & & & 0.079 \\
+\quad Male & 208 & 0.729 (0.686--0.767) & 3.14 (2.29--4.29) & & 0.688 (0.643--0.728) & 2.72 (2.01--3.68) & \\
+\quad Female & 30 & 0.722 (0.500--0.906) & 1.71 (0.76--3.81) & & 0.596 (0.382--0.781) & 1.85 (0.85--4.05) & \\
+ECOG performance status & & & & 0.994 & & & 0.073 \\
+\quad 0--1 & 209 & 0.718 (0.677--0.759) & 2.82 (2.07--3.84) & & 0.666 (0.619--0.709) & 2.29 (1.70--3.08) & \\
+\quad $\geq$ 2 & 29 & 0.781 (0.587--0.939) & 3.17 (1.07--9.35) & & 0.737 (0.543--0.898) & 7.94 (2.51--25.13) & \\
+Stage & & & & 0.999 & & & 0.974 \\
+\quad Limited & 72 & 0.720 (0.608--0.821) & 2.38 (1.18--4.81) & & 0.656 (0.559--0.742) & 2.41 (1.20--4.85) & \\
+\quad Extensive & 166 & 0.682 (0.631--0.730) & 2.29 (1.61--3.26) & & 0.626 (0.572--0.680) & 2.04 (1.45--2.85) & \\
+Liver metastasis & & & & 0.800 & & & 0.429 \\
+\quad Absent & 185 & 0.709 (0.659--0.755) & 2.44 (1.75--3.40) & & 0.650 (0.599--0.700) & 2.19 (1.58--3.05) & \\
+\quad Present & 53 & 0.692 (0.575--0.809) & 2.63 (1.03--6.68) & & 0.625 (0.483--0.751) & 2.90 (1.03--8.16) & \\
+Brain metastasis & & & & 0.957 & & & 0.981 \\
+\quad Absent & 190 & 0.722 (0.675--0.765) & 2.69 (1.94--3.73) & & 0.678 (0.629--0.724) & 2.48 (1.81--3.41) & \\
+\quad Present & 48 & 0.693 (0.549--0.806) & 2.80 (1.33--5.90) & & 0.603 (0.459--0.740) & 2.18 (1.16--4.10) & \\
+Atezolizumab & & & & 0.116 & & & 0.623 \\
+\quad Not used & 143 & 0.758 (0.709--0.804) & 3.44 (2.35--5.02) & & 0.692 (0.633--0.743) & 2.66 (1.84--3.85) & \\
+\quad Used & 95 & 0.665 (0.586--0.738) & 2.10 (1.33--3.33) & & 0.636 (0.553--0.716) & 2.23 (1.44--3.44) & \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Table 6.} Performance of the Proposed Model in Clinical Subgroups\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Proposed model, gated late fusion evaluated by nested cross-validation (outer test predictions, n = 238). C-index from patient pairs within the same test fold and subgroup (95\% CI, bootstrap). HR, high versus low risk (risk score above the median of the outer training patients); \textit{P}\textsubscript{int}, Cox interaction test. CI = confidence interval, ECOG = Eastern Cooperative Oncology Group, HR = hazard ratio, OS = overall survival, PFS = progression-free survival\par\fi
+\end{minipage}
+\end{document}

@@ -1,0 +1,41 @@
+% Table 2 (3.2 Unimodal performance)
+% 자동 생성: 실험16 nested CV (baselines_v1 · arms_rerun · 실험16 문서의 융합 fold 값).
+% 단독 문서다(캡처용). Overleaf 새 프로젝트에서 pdfLaTeX 로 컴파일한다.
+
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{booktabs,multirow,array,pifont}
+% --- 캡처할 때 제목·주석을 빼려면 아래 두 줄을 \...false 로 바꾼다 ---
+\newif\ifshowtitle \showtitletrue
+\newif\ifshownotes \shownotestrue
+\newsavebox\tablebox
+\begin{document}
+\sbox\tablebox{%
+\begin{tabular}{@{}ll cc cc@{}}
+\toprule
+Modality & Encoder & \multicolumn{2}{c}{OS} & \multicolumn{2}{c}{PFS} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+ & & C-index & $\Delta$C-index & C-index & $\Delta$C-index \\
+\midrule
+Clinical variables & MLP & \textbf{0.668 $\pm$ 0.031} & $+0.056$ & \textbf{0.625 $\pm$ 0.038} & $+0.048$ \\
+\addlinespace
+\multirow{4}{*}{Radiology report} & TF-IDF & 0.649 $\pm$ 0.044 & $+0.076$ & 0.614 $\pm$ 0.037 & $+0.059$ \\
+ & mBERT & 0.633 $\pm$ 0.032 & $+0.092$ & 0.613 $\pm$ 0.055 & $+0.061$ \\
+ & KM-BERT & 0.640 $\pm$ 0.027 & $+0.085$ & 0.608 $\pm$ 0.049 & $+0.066$ \\
+ & RadBERT & \textbf{0.661 $\pm$ 0.040} & $+0.063$ & \textbf{0.634 $\pm$ 0.046} & $+0.039$ \\
+\addlinespace
+\multirow{3}{*}{PET-CT MIP} & ResNet-18 (ImageNet) & 0.630 $\pm$ 0.064 & $+0.095$ & 0.596 $\pm$ 0.047 & $+0.078$ \\
+ & ResNet-50 (RadImageNet) & 0.592 $\pm$ 0.041 & $+0.132$ & 0.572 $\pm$ 0.044 & $+0.102$ \\
+ & Simple CNN & \textbf{0.654 $\pm$ 0.061} & $+0.071$ & \textbf{0.618 $\pm$ 0.052} & $+0.056$ \\
+\midrule
+Clinical + report + image & Hybrid fusion (proposed) & \textbf{0.725 $\pm$ 0.028} & -- & \textbf{0.674 $\pm$ 0.026} & -- \\
+\bottomrule
+\end{tabular}%
+}%
+\begin{minipage}{\wd\tablebox}
+\ifshowtitle\noindent \textbf{Table 2.} Prognostic Performance of Unimodal Models\par\vspace{4pt}\fi
+\noindent\usebox\tablebox
+\ifshownotes\par\vspace{3pt}\footnotesize\noindent Mean $\pm$ SD (sample SD) of the C-index across the five outer test folds of nested cross-validation (n = 238). $\Delta$C-index $= C_{\mathrm{fusion}} - C_{m}$, where $C_{m}$ is the C-index of model $m$ and $C_{\mathrm{fusion}}$ that of the proposed model in the same outer test fold, averaged over the five folds. Bold, encoders used in the proposed model and the proposed model. CNN = convolutional neural network, KM-BERT = Korean medical BERT, mBERT = multilingual BERT, MIP = maximum intensity projection, MLP = multilayer perceptron, OS = overall survival, PFS = progression-free survival, SD = standard deviation, TF-IDF = term frequency--inverse document frequency\par\fi
+\end{minipage}
+\end{document}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="608" height="180" viewBox="0 0 608 180">
+<rect x="10" y="10" width="30" height="70" fill="#b9a3d6" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="40" y="10" width="30" height="70" fill="#e4dbef" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="70" y="10" width="30" height="70" fill="#cbbbe2" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="100" y="10" width="30" height="70" fill="#efe9f6" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="130" y="10" width="30" height="70" fill="#bfaada" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="160" y="10" width="30" height="70" fill="#d9cceb" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="190" y="10" width="30" height="70" fill="#a98fce" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="220" y="10" width="30" height="70" fill="#e9e1f3" stroke="#9a84c2" stroke-width="0.8"/>
+<rect x="268" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="298" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="328" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="358" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="388" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="418" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="448" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="478" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="508" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="538" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<rect x="568" y="10" width="30" height="70" fill="#cfe2f7" stroke="#8fb6e0" stroke-width="0.8"/>
+<path d="M10 90 V100 H250 V90" fill="none" stroke="#999" stroke-width="1.2"/>
+<text x="130.0" y="126.0" font-family="Times New Roman" font-size="18" fill="#000" font-weight="normal" text-anchor="middle">8 continuous</text>
+<path d="M268 90 V100 H598 V90" fill="none" stroke="#999" stroke-width="1.2"/>
+<text x="433.0" y="126.0" font-family="Times New Roman" font-size="18" fill="#000" font-weight="normal" text-anchor="middle">11 categorical</text>
+<text x="292.0" y="168.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="bold" text-anchor="end">x</text>
+<text x="304.0" y="168.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="normal" text-anchor="middle">∈</text>
+<text x="316.0" y="168.0" font-family="Times New Roman" font-size="24" fill="#000" font-weight="normal" text-anchor="start">ℝ</text>
+<text x="334.0" y="157.0" font-family="Times New Roman" font-size="15" fill="#000" font-weight="normal" text-anchor="start">19</text>
+</svg>

@@ -1,6 +1,7 @@
 % !TEX program = xelatex
-% Figure 1 (CONSORT 형식, nested CV, 단순화 판): 환자 선정과 outer·inner 분할 인원.
-% 주 흐름은 세로 한 줄, outer test 는 오른쪽 가지. 수치 출처는 fig1_patient_flowchart_nested.tex 머리말에 있다.
+% Figure 1 (CONSORT 형식, nested CV, 단순화 판): 환자 선정과 outer 분할, 각 분할의 용도.
+% inner 분할 인원(fit 120-122 / stop 22 / V 47-48)은 그림에서 빼고 Methods 에 적는다.
+% 수치 출처는 fig1_patient_flowchart_nested.tex 머리말에 있다.
 \documentclass[tikz,border=8pt,10pt]{standalone}
 \usepackage{fontspec}
 \IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\setmainfont{Nimbus Roman}}
@@ -10,8 +11,7 @@
   box/.style={draw=black, line width=0.6pt, fill=white, align=center,
               inner xsep=5pt, inner ysep=4pt, text width=#1},
   box/.default=62mm,
-  excl/.style={box=74mm, align=left},
-  sub/.style={box=44mm},
+  excl/.style={box=84mm, align=left},
   arr/.style={draw=black, line width=0.6pt, -{Triangle[length=2.2mm,width=1.6mm]}},
   line/.style={draw=black, line width=0.6pt},
 ]
@@ -32,34 +32,22 @@
 
 % ---------------- nested 교차검증 ----------------
 \node[box] (cv) at (0,-5.8)
-  {Outer 5-fold stratified cross-validation\\ (stratified by OS and PFS event status)};
+  {Nested cross-validation\\ (outer 5-fold, inner 4-fold)};
 
-\node[box] (otr) at (0,-7.75)
-  {Outer training set per fold (n = 190--191)\\ 159--160 OS / 169--170 PFS events};
-\node[box=60mm] (ote) at (7.3,-7.75)
-  {Outer test set per fold (n = 47--48)\\ 39--40 OS / 42--43 PFS events};
-
-\node[box] (icv) at (0,-9.5)
-  {Inner 4-fold stratified cross-validation\\ (stratified by OS event status)};
-
-\node[sub] (itr) at (-5.0,-11.45) {Inner training\\ (n = 120--122)};
-\node[sub] (ist) at (0,-11.45)    {Early stopping\\ (n = 22)};
-\node[sub] (iva) at (5.0,-11.45)  {Inner validation\\ (n = 47--48)};
+\node[box=58mm] (otr) at (-4.2,-8.0)
+  {Outer training set (n = 190--191)\\ inner folds: model selection\\ refit on the whole set};
+\node[box=58mm] (ote) at (4.2,-8.0)
+  {Outer test set (n = 47--48)\\ evaluation (C-index)};
 
 % ---------------- 화살표 ----------------
 \draw[arr] (all) -- (final);
 \draw[arr] (0,-2.05) -- (ex.east);
 \draw[arr] (final) -- (cv);
-\draw[arr] (cv) -- (otr);
-\draw[line] (0,-6.75) -- (7.3,-6.75);
-\draw[arr] (7.3,-6.75) -- (ote.north);
-\draw[arr] (otr) -- (icv);
-
-\draw[line] (icv.south) -- (0,-10.5);
-\draw[line] (-5.0,-10.5) -- (5.0,-10.5);
-\draw[arr] (-5.0,-10.5) -- (itr.north);
-\draw[arr] (0,-10.5) -- (ist.north);
-\draw[arr] (5.0,-10.5) -- (iva.north);
+\draw[line] (cv.south) -- (0,-6.85);
+\draw[line] (-4.2,-6.85) -- (4.2,-6.85);
+\draw[arr] (-4.2,-6.85) -- (otr.north);
+\draw[arr] (4.2,-6.85) -- (ote.north);
+\draw[arr] (otr.east) -- node[above, font=\footnotesize] {refit model} (ote.west);
 
 \end{tikzpicture}
 \end{document}
